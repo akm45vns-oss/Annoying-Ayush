@@ -6,13 +6,10 @@ import InteractionMenu from './components/InteractionMenu';
 import { soundManager } from './utils/audioEffects';
 
 // Curated Dialogue Pools
-const RANDOM_DIALOGUES = [
-  "Hey beautiful! Look who's here to annoy you forever 😜",
-  "Are you here to poke me or love me? Both are accepted! 💕",
-  "I was just thinking about you... and then you showed up! 🥰",
-  "Warning: Extreme cuteness ahead! Approach with cuddles 🧸",
-  "You looked extra gorgeous today, just had to let you know! ✨",
-  "Tap my nose, cheeks, tummy, or hold me for a hug! 👉",
+const GREETING_DIALOGUES = [
+  "Hey beautiful! Ready to play? 🥰",
+  "Look who's here! Tap me anywhere 😜",
+  "I was just thinking about you! 💕",
 ];
 
 const HEAD_TAP_DIALOGUES = [
@@ -25,15 +22,15 @@ const HEAD_TAP_DIALOGUES = [
 const CHEEK_TAP_DIALOGUES = [
   "Hey! My cheeks are not mochi! ...Okay maybe they are! 🥟🥰",
   "Squish! You really like poking my cheeks, don't you? 😜",
-  "Ouchie! Cheek pinch attack! Now I'm blushing pink! 😳",
+  "Cheek pinch attack! Now I'm blushing pink! 😳",
   "Hehe that tickles right there! 🌸",
 ];
 
 const NOSE_BOOP_DIALOGUES = [
   "BOOP! Nose access granted! 👃✨",
   "Hey! Did you just boop my snoot?! 😆",
-  "Boop detected! System rebooting with 100% more love! 💖",
-  "Beep boop! You're the only one allowed to do that! 🥰",
+  "Boop detected! System rebooting with 100% love! 💖",
+  "Beep boop! Only you are allowed to do that! 🥰",
 ];
 
 const BODY_TAP_DIALOGUES = [
@@ -48,7 +45,7 @@ const ANNOYED_DIALOGUES = [
   "Okay, okay, I surrender! Stoppp poking! 🏳️😆",
   "You did that on purpose, didn't you? 😜",
   "Fine, one more hug. But that's it! 🙈❤️",
-  "Why must you tease me so much?! (Secretly love it though) 🥺",
+  "Why must you tease me so much?! (Secretly love it) 🥺",
 ];
 
 const KISS_DIALOGUES = [
@@ -61,7 +58,7 @@ const KISS_DIALOGUES = [
 const DANCE_DIALOGUES = [
   "Look at these moves! Strictly choreographed for you! 🕺✨",
   "Music in my heart, you in my thoughts! Let's groove! 🎶",
-  "Rate my dancing from 10 to 10! (No other options allowed) 😜",
+  "Rate my dancing from 10 to 10! 😜",
   "Dancing like nobody's watching except my favorite girl! 💃🕺",
 ];
 
@@ -74,8 +71,8 @@ const LAUGH_DIALOGUES = [
 
 const LOVE_NOTE_DIALOGUES = [
   "This little character was made just for you. ❤️",
-  "Out of all the people in the universe, I chose you to annoy forever! 🌍✨",
-  "Every second spent making you smile is my favorite second. 🌸",
+  "Out of everyone in the world, I chose you to annoy forever! 🌍✨",
+  "Every second making you smile is my favorite second. 🌸",
   "Reminder: You are my dream girl and my favorite notification! 📱💌",
   "You're cute, you're sweet, and you're stuck with me! 🥰",
 ];
@@ -89,24 +86,32 @@ const HUG_DIALOGUES = [
 
 export default function App() {
   const [currentAction, setCurrentAction] = useState('idle');
-  const [speechText, setSpeechText] = useState(RANDOM_DIALOGUES[0]);
+  const [speechText, setSpeechText] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [heartBurst, setHeartBurst] = useState(0);
   const [annoyanceCount, setAnnoyanceCount] = useState(0);
 
   const actionTimeoutRef = useRef(null);
-  const annoyanceResetTimerRef = useRef(null);
+  const speechTimeoutRef = useRef(null);
+  const tapCounterRef = useRef(0);
+  const tapResetTimerRef = useRef(null);
 
-  // Return to idle cleanly
-  const resetToIdle = useCallback(() => {
-    if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
-    setCurrentAction('idle');
-    setAnnoyanceCount(0);
-    setSpeechText("I'm ready for your next move! What's next? 😊");
+  // Helper to display a temporary dialogue toast that auto-dismisses
+  const showSpeech = useCallback((text, durationMs = 3800) => {
+    if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    setSpeechText(text);
+    speechTimeoutRef.current = setTimeout(() => {
+      setSpeechText('');
+    }, durationMs);
   }, []);
 
-  // Helper to safely schedule idle transition
+  const dismissSpeech = useCallback(() => {
+    if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    setSpeechText('');
+  }, []);
+
+  // Helper to schedule clean return to idle
   const scheduleReturnToIdle = useCallback((durationMs = 3000) => {
     if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
     actionTimeoutRef.current = setTimeout(() => {
@@ -114,26 +119,44 @@ export default function App() {
     }, durationMs);
   }, []);
 
-  // Track rapid taps for annoyance escalation
-  const registerTapForAnnoyance = useCallback(() => {
-    if (annoyanceResetTimerRef.current) clearTimeout(annoyanceResetTimerRef.current);
-    annoyanceResetTimerRef.current = setTimeout(() => {
-      setAnnoyanceCount(0);
-    }, 2400);
+  // Reset character and state cleanly
+  const resetToIdle = useCallback(() => {
+    if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
+    if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+    if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
 
-    setAnnoyanceCount(prev => {
-      const next = prev + 1;
-      if (next >= 5) {
-        soundManager.playAnnoyedPout();
-        setCurrentAction('annoyed');
-        const quote = ANNOYED_DIALOGUES[Math.floor(Math.random() * ANNOYED_DIALOGUES.length)];
-        setSpeechText(quote);
-        scheduleReturnToIdle(3400);
-        return 0; // reset annoyance cycle
-      }
-      return next;
-    });
-  }, [scheduleReturnToIdle]);
+    tapCounterRef.current = 0;
+    setAnnoyanceCount(0);
+    setCurrentAction('idle');
+    setHeartBurst(0);
+    showSpeech("All reset! What's next? 😊", 2400);
+  }, [showSpeech]);
+
+  // Track rapid taps for annoyance escalation
+  const handleAnnoyanceTap = useCallback(() => {
+    if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+    tapResetTimerRef.current = setTimeout(() => {
+      tapCounterRef.current = 0;
+      setAnnoyanceCount(0);
+    }, 2200);
+
+    tapCounterRef.current += 1;
+    const currentTaps = tapCounterRef.current;
+    setAnnoyanceCount(currentTaps);
+
+    if (currentTaps >= 5) {
+      // Trigger Annoyed reaction
+      tapCounterRef.current = 0;
+      setAnnoyanceCount(0);
+      soundManager.playAnnoyedPout();
+      setCurrentAction('annoyed');
+      const quote = ANNOYED_DIALOGUES[Math.floor(Math.random() * ANNOYED_DIALOGUES.length)];
+      showSpeech(quote, 3400);
+      scheduleReturnToIdle(3400);
+      return true;
+    }
+    return false;
+  }, [scheduleReturnToIdle, showSpeech]);
 
   // Main Action trigger (buttons)
   const triggerAction = useCallback((actionId) => {
@@ -142,30 +165,30 @@ export default function App() {
 
     if (actionId === 'boop') {
       const quote = NOSE_BOOP_DIALOGUES[Math.floor(Math.random() * NOSE_BOOP_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 2800);
       scheduleReturnToIdle(2600);
     } else if (actionId === 'kiss') {
       setHeartBurst(b => b + 1);
       const quote = KISS_DIALOGUES[Math.floor(Math.random() * KISS_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 3400);
       scheduleReturnToIdle(3200);
     } else if (actionId === 'dance') {
       const quote = DANCE_DIALOGUES[Math.floor(Math.random() * DANCE_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 3800);
       scheduleReturnToIdle(4000);
     } else if (actionId === 'laugh') {
       const quote = LAUGH_DIALOGUES[Math.floor(Math.random() * LAUGH_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 3200);
       scheduleReturnToIdle(3200);
     } else if (actionId === 'loveNote') {
       setHeartBurst(b => b + 1);
       const quote = LOVE_NOTE_DIALOGUES[Math.floor(Math.random() * LOVE_NOTE_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 3600);
       scheduleReturnToIdle(3600);
     }
-  }, [scheduleReturnToIdle]);
+  }, [scheduleReturnToIdle, showSpeech]);
 
-  // Touch zones on 3D Character
+  // Direct 3D Character Tap handling
   const handleCharacterTap = useCallback((part) => {
     if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
 
@@ -175,59 +198,69 @@ export default function App() {
       setCurrentAction('hug');
       setHeartBurst(b => b + 1);
       const quote = HUG_DIALOGUES[Math.floor(Math.random() * HUG_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 3600);
       scheduleReturnToIdle(3600);
       return;
     }
 
-    // Register tap for potential annoyance
-    registerTapForAnnoyance();
+    // Check for rapid annoyance escalation
+    const isAnnoyed = handleAnnoyanceTap();
+    if (isAnnoyed) return;
 
     if (part === 'head') {
       soundManager.playBoing();
       setCurrentAction('surprised');
       const quote = HEAD_TAP_DIALOGUES[Math.floor(Math.random() * HEAD_TAP_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 2800);
       scheduleReturnToIdle(2800);
     } else if (part === 'cheek') {
       soundManager.playPop();
       setCurrentAction('happy');
       const quote = CHEEK_TAP_DIALOGUES[Math.floor(Math.random() * CHEEK_TAP_DIALOGUES.length)];
-      setSpeechText(quote);
+      showSpeech(quote, 2600);
       scheduleReturnToIdle(2600);
     } else if (part === 'nose') {
       soundManager.playBoop();
       setCurrentAction('boop');
       const quote = NOSE_BOOP_DIALOGUES[Math.floor(Math.random() * NOSE_BOOP_DIALOGUES.length)];
-      setSpeechText(quote);
-      scheduleReturnToIdle(2400);
+      showSpeech(quote, 2500);
+      scheduleReturnToIdle(2500);
     } else {
       // Body / Torso
       soundManager.playPop();
       setCurrentAction('tapReaction');
       const quote = BODY_TAP_DIALOGUES[Math.floor(Math.random() * BODY_TAP_DIALOGUES.length)];
-      setSpeechText(quote);
-      scheduleReturnToIdle(2400);
+      showSpeech(quote, 2500);
+      scheduleReturnToIdle(2500);
     }
-  }, [registerTapForAnnoyance, scheduleReturnToIdle]);
+  }, [handleAnnoyanceTap, scheduleReturnToIdle, showSpeech]);
 
-  // Bubble click to cycle quotes
+  // Bubble click cycles to next line
   const handleBubbleClick = useCallback(() => {
     soundManager.playPop();
-    const otherQuotes = RANDOM_DIALOGUES.filter(q => q !== speechText);
-    const nextQuote = otherQuotes[Math.floor(Math.random() * otherQuotes.length)];
-    setSpeechText(nextQuote);
-  }, [speechText]);
+    const allQuotes = [
+      ...GREETING_DIALOGUES,
+      ...LOVE_NOTE_DIALOGUES
+    ].filter(q => q !== speechText);
+    const next = allQuotes[Math.floor(Math.random() * allQuotes.length)];
+    showSpeech(next, 3800);
+  }, [showSpeech, speechText]);
 
+  // Sound toggle with instant sound feedback on unmute
   const handleToggleMute = useCallback(() => {
     const nextMuted = soundManager.toggleMute();
     setIsMuted(nextMuted);
+    if (!nextMuted) {
+      soundManager.playPop();
+    }
   }, []);
 
+  // Clean up all active timers on unmount
   useEffect(() => {
     return () => {
       if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
-      if (annoyanceResetTimerRef.current) clearTimeout(annoyanceResetTimerRef.current);
+      if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
+      if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
     };
   }, []);
 
@@ -240,11 +273,14 @@ export default function App() {
         <Header />
 
         <div className="game-play-area">
+          {/* Compact, unobtrusive, touch-transparent speech bubble */}
           <SpeechBubble 
             text={speechText} 
+            onDismiss={dismissSpeech}
             onClickBubble={handleBubbleClick} 
           />
 
+          {/* 3D Scene prominently focused on Ayush */}
           <AyushScene
             currentAction={currentAction}
             onTapPart={handleCharacterTap}

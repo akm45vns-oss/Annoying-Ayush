@@ -80,12 +80,12 @@ export default function InteractionMenu({
       {/* Secondary Controls Bar */}
       <div className="menu-meta-bar">
         <button 
-          className="meta-button"
+          className={`meta-button ${!isMuted ? 'sound-active' : ''}`}
           onClick={onToggleMute}
           title={isMuted ? "Unmute sounds" : "Mute sounds"}
         >
           {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          <span>{isMuted ? "Muted" : "Sound"}</span>
+          <span>{isMuted ? "Muted" : "Sound ON"}</span>
         </button>
 
         <span className={`meta-badge ${annoyanceCount >= 3 ? 'annoyed-badge' : ''}`}>

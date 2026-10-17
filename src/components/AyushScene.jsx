@@ -5,14 +5,13 @@ import AyushCharacter from './AyushCharacter';
 import FloatingHearts from './FloatingHearts';
 
 // Deterministic particle positions generated once
-const PARTICLE_COUNT = 25;
+const PARTICLE_COUNT = 20;
 const PARTICLE_POSITIONS = new Float32Array(PARTICLE_COUNT * 3);
 for (let i = 0; i < PARTICLE_COUNT; i++) {
-  // Simple deterministic pseudo-spread
   const angle = (i / PARTICLE_COUNT) * Math.PI * 2;
-  const radius = 1.2 + ((i * 7) % 11) * 0.16;
+  const radius = 1.1 + ((i * 7) % 9) * 0.12;
   PARTICLE_POSITIONS[i * 3] = Math.cos(angle) * radius;
-  PARTICLE_POSITIONS[i * 3 + 1] = ((i * 13) % 20) * 0.15 - 0.2;
+  PARTICLE_POSITIONS[i * 3 + 1] = ((i * 13) % 20) * 0.12 - 0.2;
   PARTICLE_POSITIONS[i * 3 + 2] = Math.sin(angle) * radius;
 }
 
@@ -24,8 +23,8 @@ function FloatingParticles() {
 
   useFrame((state) => {
     if (pointsRef.current) {
-      pointsRef.current.rotation.y = state.clock.getElapsedTime() * 0.05;
-      pointsRef.current.position.y = Math.sin(state.clock.getElapsedTime() * 0.4) * 0.1;
+      pointsRef.current.rotation.y = state.clock.getElapsedTime() * 0.04;
+      pointsRef.current.position.y = Math.sin(state.clock.getElapsedTime() * 0.35) * 0.08;
     }
   });
 
@@ -38,10 +37,10 @@ function FloatingParticles() {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.08}
+        size={0.065}
         color="#ffccd5"
         transparent
-        opacity={0.6}
+        opacity={0.5}
         sizeAttenuation
       />
     </points>
@@ -49,30 +48,31 @@ function FloatingParticles() {
 }
 
 /**
- * Cozy Studio Room / Stage
+ * Compact, Tasteful Cozy Studio Podium Mat
+ * Proportionate to Ayush, resting cleanly directly under his sneakers.
  */
 function StudioStage() {
   return (
-    <group position={[0, -0.9, 0]}>
-      {/* Main Cozy Rug / Podium */}
-      <mesh receiveShadow position={[0, -0.02, 0]}>
-        <cylinderGeometry args={[2.2, 2.3, 0.08, 48]} />
+    <group position={[0, -0.88, 0]}>
+      {/* Soft circular pastel mat */}
+      <mesh receiveShadow position={[0, -0.01, 0]}>
+        <cylinderGeometry args={[1.25, 1.3, 0.02, 36]} />
         <meshStandardMaterial color="#fff0f5" roughness={0.9} />
       </mesh>
-      {/* Decorative Outer Ring */}
-      <mesh receiveShadow position={[0, -0.015, 0]}>
-        <ringGeometry args={[1.9, 2.1, 48]} rotation={[-Math.PI / 2, 0, 0]} />
+      {/* Gentle blush ring accent */}
+      <mesh receiveShadow position={[0, -0.008, 0]}>
+        <ringGeometry args={[1.1, 1.2, 36]} rotation={[-Math.PI / 2, 0, 0]} />
         <meshStandardMaterial color="#ffccd5" roughness={0.8} />
       </mesh>
 
-      {/* Soft Contact Shadows beneath Ayush */}
+      {/* Realistic soft ground shadow anchoring Ayush's soles */}
       <ContactShadows 
-        position={[0, 0.01, 0]} 
-        opacity={0.65} 
-        scale={4} 
-        blur={2.2} 
-        far={3} 
-        color="#885b72" 
+        position={[0, 0.002, 0]} 
+        opacity={0.7} 
+        scale={2.6} 
+        blur={1.6} 
+        far={1.8} 
+        color="#70485c" 
       />
     </group>
   );
@@ -89,16 +89,16 @@ export default function AyushScene({
     <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
       <Canvas
         shadows
-        camera={{ position: [0, 0.6, 3.8], fov: 45 }}
+        // Camera framed to view Ayush fully from hair to shoes with pleasant margins
+        camera={{ position: [0, 0.42, 3.8], fov: 42 }}
         gl={{ antialias: true, alpha: true }}
       >
-        {/* Lights */}
-        <ambientLight intensity={0.85} color="#fff8f0" />
+        {/* Ambient & Key Lighting */}
+        <ambientLight intensity={0.88} color="#fff8f0" />
         
-        {/* Key Light with Soft Shadow */}
         <directionalLight
-          position={[3, 5, 4]}
-          intensity={1.2}
+          position={[2.5, 4.5, 3.5]}
+          intensity={1.15}
           castShadow
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
@@ -107,10 +107,10 @@ export default function AyushScene({
         />
 
         {/* Soft Pink Rim / Fill Light */}
-        <pointLight position={[-3, 2, -2]} intensity={0.7} color="#ffb3c6" />
+        <pointLight position={[-2.5, 2, -1.8]} intensity={0.65} color="#ffb3c6" />
 
         {/* Warm Bottom Bounce Light */}
-        <pointLight position={[0, -1, 2]} intensity={0.4} color="#ffd1dc" />
+        <pointLight position={[0, -0.8, 1.8]} intensity={0.35} color="#ffd1dc" />
 
         {/* 3D Studio Stage & Atmosphere */}
         <StudioStage />
@@ -125,15 +125,16 @@ export default function AyushScene({
           setIsHovered={setIsHovered}
         />
 
-        {/* Constrained Camera Orbit Controls */}
+        {/* Constrained Camera Orbit Controls centered on character midpoint */}
         <OrbitControls
+          target={[0, 0.38, 0]}
           enablePan={false}
           enableZoom={true}
-          minDistance={2.6}
-          maxDistance={5.2}
-          minPolarAngle={Math.PI / 3}
+          minDistance={2.8}
+          maxDistance={4.8}
+          minPolarAngle={Math.PI / 2.8}
           maxPolarAngle={Math.PI / 1.95}
-          dampingFactor={0.05}
+          dampingFactor={0.06}
         />
       </Canvas>
     </div>

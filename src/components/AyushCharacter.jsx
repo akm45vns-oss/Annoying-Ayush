@@ -333,13 +333,14 @@ export default function AyushCharacter({
       rightArmRef.current.rotation.z = THREE.MathUtils.damp(rightArmRef.current.rotation.z, targetRightArmRotZ, 8, delta);
     }
 
-    // 7. Tap Bounce Spring Modifiers
+    // 7. Tap Bounce Spring Modifiers (Strictly relative to ground BASE_Y = -0.9)
+    const BASE_Y = -0.9;
     if (bounceIntensityRef.current > 0) {
       reactionTimeRef.current += delta;
       const bounce = Math.sin(reactionTimeRef.current * 16) * Math.exp(-reactionTimeRef.current * 4) * bounceIntensityRef.current;
       
       if (groupRef.current) {
-        groupRef.current.position.y = Math.max(0, bounce * 0.35);
+        groupRef.current.position.y = BASE_Y + Math.max(0, bounce * 0.35);
         groupRef.current.position.z = THREE.MathUtils.damp(groupRef.current.position.z, targetGroupZ, 8, delta);
         groupRef.current.scale.set(
           1 + bounce * 0.12,
@@ -351,10 +352,11 @@ export default function AyushCharacter({
         bounceIntensityRef.current = 0;
         if (groupRef.current) {
           groupRef.current.scale.set(1, 1, 1);
-          groupRef.current.position.y = 0;
+          groupRef.current.position.y = BASE_Y;
         }
       }
     } else if (groupRef.current) {
+      groupRef.current.position.y = BASE_Y;
       groupRef.current.position.z = THREE.MathUtils.damp(groupRef.current.position.z, targetGroupZ, 8, delta);
     }
   });
