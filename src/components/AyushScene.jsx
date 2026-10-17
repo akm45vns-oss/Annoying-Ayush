@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import AyushCharacter from './AyushCharacter';
+import FloatingHearts from './FloatingHearts';
 
 // Deterministic particle positions generated once
 const PARTICLE_COUNT = 25;
@@ -81,7 +82,8 @@ export default function AyushScene({
   currentAction,
   onTapPart,
   isHovered,
-  setIsHovered
+  setIsHovered,
+  heartBurst = 0
 }) {
   return (
     <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
@@ -113,6 +115,7 @@ export default function AyushScene({
         {/* 3D Studio Stage & Atmosphere */}
         <StudioStage />
         <FloatingParticles />
+        <FloatingHearts burstTrigger={heartBurst} />
 
         {/* Central Cartoon Ayush Character */}
         <AyushCharacter

@@ -378,6 +378,27 @@ html, body {
   padding: 4px 10px;
   border-radius: 12px;
   border: 1px solid #e1bee7;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.25s ease;
+}
+
+.meta-badge.annoyed-badge {
+  background: #ffebee !important;
+  color: #c2185b !important;
+  border-color: #ff80ab !important;
+  box-shadow: 0 2px 10px rgba(233, 30, 99, 0.2);
+}
+
+.flame-icon {
+  color: #ff1744;
+  animation: flameFlicker 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes flameFlicker {
+  from { transform: scale(0.9); }
+  to { transform: scale(1.25); }
 }
 
 /* Main Action Buttons Grid */
@@ -385,6 +406,11 @@ html, body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+}
+
+.action-buttons-grid.action-buttons-5 {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
 }
 
 .action-btn {
@@ -399,6 +425,11 @@ html, body {
   cursor: pointer;
   transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.action-buttons-5 .action-btn {
+  padding: 8px 2px 6px;
+  border-radius: 16px;
 }
 
 .action-btn:hover {
@@ -425,6 +456,12 @@ html, body {
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+.action-buttons-5 .btn-icon-wrapper {
+  width: 35px;
+  height: 35px;
+  margin-bottom: 3px;
+}
+
 .action-btn:hover .btn-icon-wrapper {
   transform: scale(1.12);
   background: #ffe3eb;
@@ -449,10 +486,19 @@ html, body {
   line-height: 1.1;
 }
 
+.action-buttons-5 .btn-label {
+  font-size: 0.71rem;
+}
+
 .btn-sublabel {
   font-size: 0.64rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+.action-buttons-5 .btn-sublabel {
+  font-size: 0.58rem;
+  margin-top: 1px;
 }
 
 /* 4. MODAL POPUP */
@@ -564,3 +610,20 @@ html, body {
 .modal-action-btn:active {
   transform: scale(0.96);
 }
+
+/* 5. ACCESSIBILITY: REDUCED MOTION */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .heart-pulse, 
+  .bg-glow-orb, 
+  .flame-icon,
+  .sparkle-icon {
+    animation: none !important;
+  }
+}
+

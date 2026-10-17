@@ -77,6 +77,34 @@ class SoundController {
     }
   }
 
+  playBoop() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(650, now);
+      osc.frequency.exponentialRampToValueAtTime(980, now + 0.05);
+      osc.frequency.exponentialRampToValueAtTime(520, now + 0.12);
+
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } catch (e) {
+      console.warn('Audio play error:', e);
+    }
+  }
+
   playChime() {
     if (this.isMuted) return;
     this.init();
@@ -106,33 +134,178 @@ class SoundController {
     }
   }
 
-  playGiggle() {
+  playKiss() {
     if (this.isMuted) return;
     this.init();
     if (!this.ctx) return;
 
     try {
-      const giggles = [440, 580, 480, 620, 520];
-      giggles.forEach((freq, index) => {
-        const start = this.ctx.currentTime + index * 0.05;
+      const now = this.ctx.currentTime;
+      // 1. Cute smack
+      const oscSmack = this.ctx.createOscillator();
+      const gainSmack = this.ctx.createGain();
+      oscSmack.type = 'sine';
+      oscSmack.frequency.setValueAtTime(700, now);
+      oscSmack.frequency.exponentialRampToValueAtTime(1400, now + 0.04);
+      oscSmack.frequency.exponentialRampToValueAtTime(450, now + 0.09);
+
+      gainSmack.gain.setValueAtTime(0.35, now);
+      gainSmack.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      oscSmack.connect(gainSmack);
+      gainSmack.connect(this.ctx.destination);
+
+      oscSmack.start(now);
+      oscSmack.stop(now + 0.1);
+
+      // 2. Sweet romantic chime follow-up
+      const heartNotes = [659.25, 880, 1174.66]; // E5, A5, D6
+      heartNotes.forEach((freq, i) => {
+        const t = now + 0.08 + i * 0.07;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.16, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.26);
+      });
+    } catch (e) {
+      console.warn('Audio play error:', e);
+    }
+  }
+
+  playLaugh() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      // Bouncy rhythmic giggle pattern
+      const pitchSteps = [520, 680, 600, 750, 640, 780, 660];
+      pitchSteps.forEach((freq, index) => {
+        const start = this.ctx.currentTime + index * 0.065;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
 
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, start);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.15, start + 0.04);
 
-        gain.gain.setValueAtTime(0.15, start);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.07);
+        gain.gain.setValueAtTime(0.2, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.065);
 
         osc.connect(gain);
         gain.connect(this.ctx.destination);
 
         osc.start(start);
-        osc.stop(start + 0.08);
+        osc.stop(start + 0.07);
       });
     } catch (e) {
       console.warn('Audio play error:', e);
     }
+  }
+
+  playDanceBeat() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const beats = [
+        { f: 220, t: 0 },
+        { f: 330, t: 0.12 },
+        { f: 260, t: 0.24 },
+        { f: 440, t: 0.36 },
+        { f: 330, t: 0.48 },
+        { f: 523, t: 0.60 },
+      ];
+
+      beats.forEach(({ f, t }) => {
+        const start = now + t;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, start);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.8, start + 0.09);
+
+        gain.gain.setValueAtTime(0.22, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.11);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(start);
+        osc.stop(start + 0.12);
+      });
+    } catch (e) {
+      console.warn('Audio play error:', e);
+    }
+  }
+
+  playAnnoyedPout() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(420, now);
+      osc.frequency.linearRampToValueAtTime(260, now + 0.25);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.27);
+    } catch (e) {
+      console.warn('Audio play error:', e);
+    }
+  }
+
+  playHug() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      // Warm chord: F4, A4, C5
+      const chord = [349.23, 440.0, 523.25];
+      chord.forEach((freq) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.65);
+      });
+    } catch (e) {
+      console.warn('Audio play error:', e);
+    }
+  }
+
+  playGiggle() {
+    this.playLaugh();
   }
 }
 

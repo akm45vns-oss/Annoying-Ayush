@@ -1,12 +1,14 @@
 import React from 'react';
 import { 
-  Hand, 
-  Sparkles, 
   Heart, 
   RotateCcw, 
   Smile, 
   Volume2, 
-  VolumeX 
+  VolumeX,
+  Music,
+  Mail,
+  Sparkles,
+  Flame
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
@@ -15,42 +17,63 @@ export default function InteractionMenu({
   onReset,
   currentAction,
   isMuted,
-  onToggleMute
+  onToggleMute,
+  annoyanceCount = 0
 }) {
   const actions = [
     {
-      id: 'poke',
-      label: 'Poke Me',
-      sublabel: 'Tickle!',
-      icon: Hand,
+      id: 'boop',
+      label: 'Boop!',
+      sublabel: 'Nose tap',
+      icon: Sparkles,
       color: '#ff6b8b',
-      sound: () => soundManager.playBoing(),
-    },
-    {
-      id: 'wave',
-      label: 'Wave',
-      sublabel: 'Say Hi',
-      icon: Smile,
-      color: '#ffa726',
-      sound: () => soundManager.playPop(),
+      sound: () => soundManager.playBoop(),
     },
     {
       id: 'kiss',
       label: 'Blow Kiss',
-      sublabel: 'Mwah!',
+      sublabel: 'Mwah! 💋',
       icon: Heart,
       color: '#e91e63',
-      sound: () => soundManager.playChime(),
+      sound: () => soundManager.playKiss(),
     },
     {
-      id: 'compliment',
-      label: 'Sweet Talk',
-      sublabel: 'Romance',
-      icon: Sparkles,
-      color: '#ab47bc',
-      sound: () => soundManager.playGiggle(),
+      id: 'dance',
+      label: 'Dance',
+      sublabel: 'Groove!',
+      icon: Music,
+      color: '#8e24aa',
+      sound: () => soundManager.playDanceBeat(),
+    },
+    {
+      id: 'laugh',
+      label: 'Make Laugh',
+      sublabel: 'Giggles',
+      icon: Smile,
+      color: '#ffa000',
+      sound: () => soundManager.playLaugh(),
+    },
+    {
+      id: 'loveNote',
+      label: 'Love Note',
+      sublabel: 'Affection',
+      icon: Mail,
+      color: '#00acc1',
+      sound: () => soundManager.playChime(),
     },
   ];
+
+  const getMoodLabel = () => {
+    if (annoyanceCount >= 5) return '😤 Annoyance: High!';
+    if (annoyanceCount >= 3) return '⚡ Teased!';
+    if (currentAction === 'dance') return '🕺 Grooving!';
+    if (currentAction === 'kiss') return '💋 Sending Love';
+    if (currentAction === 'laugh') return '😆 Laughing!';
+    if (currentAction === 'hug') return '🧸 Cuddling!';
+    if (currentAction === 'surprised') return '😲 Surprised!';
+    if (currentAction === 'boop') return '👃 Booped!';
+    return '✨ Ready for love';
+  };
 
   return (
     <div className="interaction-menu-container">
@@ -61,29 +84,30 @@ export default function InteractionMenu({
           onClick={onToggleMute}
           title={isMuted ? "Unmute sounds" : "Mute sounds"}
         >
-          {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-          <span>{isMuted ? "Unmute" : "Sound ON"}</span>
+          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          <span>{isMuted ? "Muted" : "Sound"}</span>
         </button>
 
-        <span className="meta-badge">
-          {currentAction === 'idle' ? '✨ Ready for attention' : `✨ Action: ${currentAction}`}
+        <span className={`meta-badge ${annoyanceCount >= 3 ? 'annoyed-badge' : ''}`}>
+          {annoyanceCount >= 3 && <Flame size={12} className="flame-icon" />}
+          {getMoodLabel()}
         </span>
 
         <button 
-          className="meta-button"
+          className="meta-button reset-btn"
           onClick={() => {
             soundManager.playPop();
             onReset();
           }}
-          title="Reset to idle pose"
+          title="Reset to neutral idle"
         >
-          <RotateCcw size={16} />
+          <RotateCcw size={15} />
           <span>Reset</span>
         </button>
       </div>
 
       {/* Main Action Buttons Grid */}
-      <div className="action-buttons-grid">
+      <div className="action-buttons-grid action-buttons-5">
         {actions.map((act) => {
           const Icon = act.icon;
           const isActive = currentAction === act.id;
@@ -98,7 +122,7 @@ export default function InteractionMenu({
               }}
             >
               <div className="btn-icon-wrapper">
-                <Icon size={22} className="btn-icon" />
+                <Icon size={20} className="btn-icon" />
               </div>
               <div className="btn-label-group">
                 <span className="btn-label">{act.label}</span>
