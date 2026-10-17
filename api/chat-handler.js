@@ -159,10 +159,10 @@ async function callGemini(apiKey, systemPrompt, history, userMessage) {
   return reply.trim();
 }
 
-// Call OpenAI API
-async function callOpenAI(apiKey, systemPrompt, history, userMessage) {
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-  const baseURL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+// Call OpenAI or OpenAI-compatible APIs (including Groq, OpenRouter, etc.)
+async function callOpenAI(apiKey, systemPrompt, history, userMessage, overrideModel, overrideBaseUrl) {
+  const model = overrideModel || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const baseURL = overrideBaseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
   const url = `${baseURL.replace(/\/+$/, '')}/chat/completions`;
 
   const messages = [
@@ -202,13 +202,13 @@ async function callOpenAI(apiKey, systemPrompt, history, userMessage) {
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
-    throw new Error(`OpenAI API error status ${response.status}: ${errText.slice(0, 100)}`);
+    throw new Error(`AI API error status ${response.status}: ${errText.slice(0, 100)}`);
   }
 
   const data = await response.json();
   const reply = data?.choices?.[0]?.message?.content;
   if (!reply) {
-    throw new Error('OpenAI returned an empty reply.');
+    throw new Error('AI provider returned an empty reply.');
   }
 
   return reply.trim();
@@ -261,18 +261,19 @@ export async function handleChatRequest(req, res) {
   const ayushName = String(body.ayushName || 'Ayush').trim().slice(0, 30);
   const history = Array.isArray(body.history) ? body.history.slice(-8) : []; // Limit to last 8 turns
 
-  // Check Provider Configuration
+  // Check Provider Configuration: Groq, Gemini, or OpenAI
+  const groqKey = process.env.GROQ_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  if (!geminiKey && !openaiKey) {
+  if (!groqKey && !geminiKey && !openaiKey) {
     // Graceful unconfigured response: let the frontend know to seamlessly use smart offline fallback
     res.statusCode = 200;
     res.end(JSON.stringify({
       ok: false,
       configured: false,
       error: 'AI API key not configured on server.',
-      message: 'No server-side AI key found (GEMINI_API_KEY or OPENAI_API_KEY).'
+      message: 'No server-side AI key found (GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY).'
     }));
     return;
   }
@@ -283,7 +284,11 @@ export async function handleChatRequest(req, res) {
     let replyText = '';
     let providerName = '';
 
-    if (geminiKey) {
+    if (groqKey) {
+      providerName = 'groq';
+      const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+      replyText = await callOpenAI(groqKey, systemPrompt, history, userMessage, groqModel, 'https://api.groq.com/openai/v1');
+    } else if (geminiKey) {
       providerName = 'gemini';
       replyText = await callGemini(geminiKey, systemPrompt, history, userMessage);
     } else {

@@ -27,6 +27,8 @@ function apiDevServerPlugin() {
 export default defineConfig(({ mode }) => {
   // Load server-side environment variables from .env or .env.local without exposing to client bundle
   const env = loadEnv(mode, process.cwd(), '');
+  if (env.GROQ_API_KEY) process.env.GROQ_API_KEY = env.GROQ_API_KEY;
+  if (env.GROQ_MODEL) process.env.GROQ_MODEL = env.GROQ_MODEL;
   if (env.GEMINI_API_KEY) process.env.GEMINI_API_KEY = env.GEMINI_API_KEY;
   if (env.GEMINI_MODEL) process.env.GEMINI_MODEL = env.GEMINI_MODEL;
   if (env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = env.OPENAI_API_KEY;
