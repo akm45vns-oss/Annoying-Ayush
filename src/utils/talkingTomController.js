@@ -20,6 +20,20 @@ export const LISTENING_STATES = {
   ERROR: 'error'
 };
 
+const OPT_IN_STORAGE_KEY = 'ayush_continuous_listening_opted_in';
+
+export async function checkMicrophonePermission() {
+  if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+    try {
+      const status = await navigator.permissions.query({ name: 'microphone' });
+      return status.state; // 'granted' | 'prompt' | 'denied'
+    } catch {
+      return 'prompt';
+    }
+  }
+  return 'prompt';
+}
+
 export class TalkingTomController {
   constructor(options = {}) {
     this.options = {
@@ -60,6 +74,22 @@ export class TalkingTomController {
 
     // Bind event handlers
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+  }
+
+  hasOptedIn() {
+    if (typeof window === 'undefined' || !window.localStorage) return false;
+    try {
+      return window.localStorage.getItem(OPT_IN_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  setOptedIn(enabled) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      window.localStorage.setItem(OPT_IN_STORAGE_KEY, enabled ? 'true' : 'false');
+    } catch {}
   }
 
   addStateListener(fn) {
@@ -139,6 +169,7 @@ export class TalkingTomController {
     }
 
     this.isExplicitlyEnabled = true;
+    this.setOptedIn(true);
     this.clearAllTimers();
 
     if (!this.initRecognition()) {
@@ -158,6 +189,7 @@ export class TalkingTomController {
    */
   stopListening() {
     this.isExplicitlyEnabled = false;
+    this.setOptedIn(false);
     this.wasListeningBeforeHidden = false;
     this.wasListeningBeforeInterruption = false;
     this.clearAllTimers();
@@ -355,8 +387,13 @@ export class TalkingTomController {
     if (!phrase) return;
     const clean = phrase.trim();
 
-    // Ignore tiny utterances or punctuation-only
-    if (clean.length < 2) return;
+    // Ignore tiny utterances, non-alphanumeric noise, clicks, or coughs
+    if (clean.length < 2 || !/[a-zA-Z0-9]/.test(clean)) return;
+
+    // Filter isolated ambient noise / filler utterances that browsers commonly emit for coughs/breaths
+    const normalized = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const fillerWords = new Set(['uh', 'um', 'ah', 'eh', 'mm', 'hm', 'mhm', 'shh', 'tsk']);
+    if (fillerWords.has(normalized)) return;
 
     // Deduplication: prevent repeating the exact same phrase within dedupWindowMs
     const now = Date.now();

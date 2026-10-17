@@ -247,6 +247,62 @@ html, body {
   outline-offset: var(--focus-offset);
 }
 
+/* Header Mic Status Pill */
+.header-mic-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  padding: 4px 10px;
+  min-height: 34px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--motion-fast) var(--ease-standard);
+}
+
+.header-mic-pill:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.header-mic-pill.active {
+  background: #E8F5E9;
+  border-color: #81C784;
+  color: #2E7D32;
+  box-shadow: 0 1px 4px rgba(46, 125, 50, 0.15);
+}
+
+.header-mic-pill:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.header-mic-text {
+  font-size: 0.72rem;
+}
+
+.mic-pulse {
+  animation: micPulseAnimation 1.6s ease-in-out infinite;
+}
+
+@keyframes micPulseAnimation {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -381,6 +437,85 @@ html, body {
 }
 
 /* ==========================================================================
+   TALKING TOM HANDS-FREE START PROMPT
+   ========================================================================== */
+
+.tom-start-prompt-wrap {
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: auto;
+  max-width: 90%;
+  pointer-events: auto;
+  animation: tomPromptFadeUp 220ms var(--ease-standard);
+}
+
+@keyframes tomPromptFadeUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.tom-start-prompt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--color-primary);
+  color: var(--color-primary-hover);
+  padding: 10px 20px;
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(233, 121, 162, 0.32);
+  transition: all var(--motion-fast) var(--ease-standard);
+}
+
+.tom-start-prompt-btn:hover {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(233, 121, 162, 0.42);
+}
+
+.tom-start-prompt-btn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.prompt-mic-icon {
+  flex-shrink: 0;
+}
+
+.tom-mic-error-pill {
+  background: #FFEBEE;
+  border: 1px solid #FFCDD2;
+  color: #C62828;
+  font-size: var(--text-xs);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  text-align: center;
+  max-width: 300px;
+  line-height: 1.35;
+}
+
+/* ==========================================================================
    INTERACTION MENU & BOTTOM DOCK
    ========================================================================== */
 
@@ -407,14 +542,14 @@ html, body {
 
 .nav-tab-btn {
   flex: 1;
-  max-width: 155px;
+  max-width: 210px;
   min-height: var(--touch-target);
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface-soft);
   font-family: var(--font-display);
-  font-size: var(--text-xs);
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--color-text-muted);
   display: inline-flex;
@@ -1960,6 +2095,71 @@ html, body {
 .text-rose { color: var(--color-primary-hover); }
 .text-green { color: var(--color-success); }
 .text-yellow { color: var(--color-warning); }
+
+/* Voice & Repeat Style Options in Settings */
+.settings-hint-text {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.voice-style-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.voice-style-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 14px;
+  min-height: 44px;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--motion-fast) var(--ease-standard);
+}
+
+.voice-style-btn:hover {
+  background: var(--color-surface-soft);
+  border-color: var(--color-primary);
+}
+
+.voice-style-btn.active {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-button);
+}
+
+.voice-style-btn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.voice-style-emoji {
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.voice-style-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.voice-style-name {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.voice-style-desc {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
 
 .avatar-model-config {
   background: var(--color-surface-soft);

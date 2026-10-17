@@ -9,7 +9,8 @@ import {
   Sparkles, 
   MessageCircleHeart, 
   RotateCcw,
-  Check
+  Check,
+  Mic
 } from 'lucide-react';
 import { DEFAULT_SETTINGS, calculateDaysTogether } from '../utils/romanticSettings';
 import { soundManager } from '../utils/audioEffects';
@@ -215,6 +216,61 @@ export default function RomanticSettingsModal({
                 onChange={(e) => handleChange('floatingEffectsEnabled', e.target.checked)}
               />
             </label>
+          </section>
+
+          {/* 3. Voice & Repeat Style */}
+          <section className="settings-section">
+            <h3 className="section-label">
+              <Mic size={14} className="label-icon text-purple" />
+              <span>Voice & Repeat Style</span>
+            </h3>
+            <p className="settings-hint-text">Choose how Ayush repeats your speech:</p>
+            <div className="voice-style-options">
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.voiceMode === 'funny' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('voiceMode', 'funny');
+                }}
+              >
+                <span className="voice-style-emoji">🐿️</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Funny Ayush</span>
+                  <span className="voice-style-desc">Signature cartoon chipmunk pitch</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.voiceMode === 'device' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('voiceMode', 'device');
+                }}
+              >
+                <span className="voice-style-emoji">🗣️</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Device Voice</span>
+                  <span className="voice-style-desc">Natural browser speech synthesis</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.voiceMode === 'cloned' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('voiceMode', 'cloned');
+                }}
+              >
+                <span className="voice-style-emoji">🎙️</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Cloned Voice</span>
+                  <span className="voice-style-desc">Custom server voice (fallback safe)</span>
+                </div>
+              </button>
+            </div>
           </section>
 
           {/* 4. 3D Avatar Model Section */}

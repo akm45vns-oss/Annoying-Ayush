@@ -1,6 +1,10 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { TalkingTomController, LISTENING_STATES } from '../src/utils/talkingTomController.js';
+import { 
+  TalkingTomController, 
+  LISTENING_STATES, 
+  checkMicrophonePermission 
+} from '../src/utils/talkingTomController.js';
 
 /**
  * Mock SpeechRecognition implementation for testing state machine,
@@ -340,6 +344,100 @@ describe('Talking Tom Continuous Listening & Audio Loop Prevention', () => {
     assert.equal(errorReported, 'NotReadableError');
 
     controller.destroy();
+  });
+
+  it('persists and restores user opt-in status across sessions', () => {
+    const store = {};
+    globalThis.window.localStorage = {
+      getItem: (k) => store[k] || null,
+      setItem: (k, v) => { store[k] = String(v); },
+      removeItem: (k) => { delete store[k]; }
+    };
+
+    const controller = new TalkingTomController();
+    assert.equal(controller.hasOptedIn(), false);
+
+    controller.startListening();
+    assert.equal(controller.hasOptedIn(), true);
+
+    controller.stopListening();
+    assert.equal(controller.hasOptedIn(), false);
+
+    controller.setOptedIn(true);
+    assert.equal(controller.hasOptedIn(), true);
+
+    controller.destroy();
+  });
+
+  it('filters out non-speech clicks, punctuation, and isolated filler utterances', () => {
+    const controller = new TalkingTomController();
+    const emittedPhrases = [];
+    controller.onPhraseFinalized = (phrase) => {
+      emittedPhrases.push(phrase);
+    };
+
+    controller.startListening();
+
+    // 1. Single character or empty
+    controller.processFinalPhrase('a');
+    controller.processFinalPhrase('  ');
+
+    // 2. Punctuation only or noise click symbols
+    controller.processFinalPhrase('...');
+    controller.processFinalPhrase('!?');
+
+    // 3. Isolated ambient noise filler words (throat clearing, cough, breathing tokens)
+    controller.processFinalPhrase('uh');
+    controller.processFinalPhrase('Um');
+    controller.processFinalPhrase('ah');
+    controller.processFinalPhrase('mm');
+    controller.processFinalPhrase('hm');
+    controller.processFinalPhrase('shh');
+
+    assert.equal(emittedPhrases.length, 0, 'Noise clicks and filler words must be ignored');
+
+    // 4. Valid spoken words and phrases must be accepted
+    controller.processFinalPhrase('Hey Ayush');
+    assert.equal(emittedPhrases.length, 1);
+    assert.equal(emittedPhrases[0], 'Hey Ayush');
+
+    controller.destroy();
+  });
+
+  it('checks microphone permission state gracefully', async () => {
+    // 1. When navigator.permissions is undefined or not implemented in environment
+    const resultUndefined = await checkMicrophonePermission();
+    assert.equal(resultUndefined, 'prompt');
+
+    // 2. When navigator.permissions is present and granted
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    try {
+      Object.defineProperty(globalThis, 'navigator', {
+        value: {
+          permissions: {
+            query: async ({ name }) => {
+              assert.equal(name, 'microphone');
+              return { state: 'granted' };
+            }
+          }
+        },
+        configurable: true,
+        writable: true
+      });
+      const resultGranted = await checkMicrophonePermission();
+      assert.equal(resultGranted, 'granted');
+
+      // 3. When permissions query throws an error
+      globalThis.navigator.permissions.query = async () => {
+        throw new Error('Permission query error');
+      };
+      const resultFallback = await checkMicrophonePermission();
+      assert.equal(resultFallback, 'prompt');
+    } finally {
+      if (originalNavigator) {
+        Object.defineProperty(globalThis, 'navigator', originalNavigator);
+      }
+    }
   });
 });
 

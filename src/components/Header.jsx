@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, Info, X, Settings, MessageCircle } from 'lucide-react';
+import { Heart, Info, X, Settings, Mic } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
 export default function Header({
   onOpenSettings,
-  onOpenChat,
+  onOpenChat: _onOpenChat,
   onUnlockSecretHeart,
   daysTogether = null,
   gfName = 'Babe',
-  ayushName = 'Ayush'
+  ayushName = 'Ayush',
+  isListening = false,
+  onToggleListening = () => {}
 }) {
   const [showInfo, setShowInfo] = useState(false);
   const heartTapsRef = useRef(0);
@@ -67,15 +69,16 @@ export default function Header({
             <div className="header-actions">
               <button 
                 type="button"
-                className="icon-action-btn chat-toggle-btn" 
+                className={`header-mic-pill ${isListening ? 'active' : ''}`} 
                 onClick={() => {
                   soundManager.playPop();
-                  if (onOpenChat) onOpenChat();
+                  if (onToggleListening) onToggleListening();
                 }}
-                title="Chat with Ayush 💬"
-                aria-label="Open chat"
+                title={isListening ? "Listening hands-free. Tap to pause." : "Voice repeat paused. Tap to enable."}
+                aria-label="Toggle continuous voice repeat"
               >
-                <MessageCircle size={18} />
+                <Mic size={14} className={isListening ? 'mic-pulse' : ''} />
+                <span className="header-mic-text">{isListening ? 'Voice On' : 'Voice Off'}</span>
               </button>
 
               <button 

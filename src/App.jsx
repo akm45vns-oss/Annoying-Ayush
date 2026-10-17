@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Mic } from 'lucide-react';
 import Header from './components/Header';
 import AyushScene from './components/AyushScene';
 import SpeechBubble from './components/SpeechBubble';
@@ -8,7 +9,11 @@ import SecretLetterModal from './components/SecretLetterModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
 import { clonedVoiceEngine } from './utils/clonedVoiceEngine';
-import { talkingTomController } from './utils/talkingTomController';
+import { 
+  talkingTomController, 
+  LISTENING_STATES, 
+  checkMicrophonePermission 
+} from './utils/talkingTomController';
 import { 
   getTimeAwareGreeting, 
   formatDialogue,
@@ -44,10 +49,47 @@ export default function App() {
   const [heartBurst, setHeartBurst] = useState(0);
   const [annoyanceCount, setAnnoyanceCount] = useState(0);
 
-  // Milestone 3: Voice repeat state (preserved intact)
-  const [activeTab, setActiveTab] = useState('play'); // 'play' | 'voice'
-  const [voiceMode, setVoiceMode] = useState('funny'); // 'funny' | 'original'
+  // Milestone 3: Voice repeat state (hands-free Talking Tom default)
+  const [activeTab, setActiveTab] = useState('play'); // 'play' | 'chat'
+  const voiceMode = settings.voiceMode || 'funny';
   const [talkingVolume, setTalkingVolume] = useState(0);
+  const [isListening, setIsListening] = useState(
+    () => talkingTomController.isExplicitlyEnabled && talkingTomController.state === LISTENING_STATES.LISTENING
+  );
+  const [micErrorMessage, setMicErrorMessage] = useState('');
+
+  // Sync isListening with talkingTomController state events
+  useEffect(() => {
+    const handleState = (state, detail = {}) => {
+      setIsListening(talkingTomController.isExplicitlyEnabled && state === LISTENING_STATES.LISTENING);
+      if (state === LISTENING_STATES.ERROR && detail.message) {
+        setMicErrorMessage(detail.message);
+      } else if (state === LISTENING_STATES.LISTENING) {
+        setMicErrorMessage('');
+      }
+    };
+    talkingTomController.addStateListener(handleState);
+    return () => {
+      talkingTomController.removeStateListener(handleState);
+    };
+  }, []);
+
+  // Hands-free auto-start on load if previously opted in and microphone permission is already granted
+  useEffect(() => {
+    let isMounted = true;
+    async function checkAutoStart() {
+      if (talkingTomController.hasOptedIn()) {
+        const perm = await checkMicrophonePermission();
+        if (isMounted && perm === 'granted') {
+          talkingTomController.startListening();
+        }
+      }
+    }
+    checkAutoStart();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Secret combo buffer
   const comboBufferRef = useRef([]);
@@ -161,12 +203,13 @@ export default function App() {
   // Talking Tom Continuous Repeat Loop:
   // When user finishes a phrase, Ayush repeats it using the active voiceMode,
   // then resumes listening after a feedback-preventing cooldown.
+  // Requirement 5: Do NOT show transcript or subtitles in SpeechBubble!
   useEffect(() => {
     talkingTomController.onPhraseFinalized = (phrase) => {
-      showSpeech(phrase, 4200);
       talkingTomController.setSpeaking(true);
 
-      clonedVoiceEngine.speakPhraseWithMode(phrase, voiceMode, {
+      const activeVoice = settings.voiceMode || voiceMode || 'funny';
+      clonedVoiceEngine.speakPhraseWithMode(phrase, activeVoice, {
         onStart: () => {
           handlePlaybackStart();
         },
@@ -186,7 +229,7 @@ export default function App() {
     return () => {
       talkingTomController.onPhraseFinalized = null;
     };
-  }, [voiceMode, showSpeech, handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
+  }, [settings.voiceMode, voiceMode, handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
 
   // Pause continuous repeat during AI Chat to prevent audio competition
   useEffect(() => {
@@ -196,6 +239,22 @@ export default function App() {
       talkingTomController.resumeListening();
     }
   }, [activeTab]);
+
+  const handleStartListening = useCallback(() => {
+    soundManager.playPop();
+    setMicErrorMessage('');
+    talkingTomController.startListening();
+  }, []);
+
+  const handleToggleListening = useCallback(() => {
+    soundManager.playPop();
+    setMicErrorMessage('');
+    if (talkingTomController.isExplicitlyEnabled) {
+      talkingTomController.stopListening();
+    } else {
+      talkingTomController.startListening();
+    }
+  }, []);
 
   // Reset character and state cleanly
   const resetToIdle = useCallback(() => {
@@ -484,6 +543,8 @@ export default function App() {
           daysTogether={daysTogether}
           gfName={settings.gfName}
           ayushName={settings.ayushName}
+          isListening={isListening}
+          onToggleListening={handleToggleListening}
         />
 
         <div className="game-play-area">
@@ -494,7 +555,7 @@ export default function App() {
             onClickBubble={handleBubbleClick} 
           />
 
-          {/* 3D Scene prominently focused on Ayush */}
+          {/* 3D Scene prominently focused on Ayush (65-75% viewport) */}
           <AyushScene
             customModelUrl={settings.customModelUrl}
             currentAction={currentAction}
@@ -505,6 +566,24 @@ export default function App() {
             talkingVolume={talkingVolume}
             floatingEffectsEnabled={settings.floatingEffectsEnabled}
           />
+
+          {/* Single clear start/permission prompt when hands-free listening is not active */}
+          {!isListening && activeTab !== 'chat' && (
+            <div className="tom-start-prompt-wrap">
+              <button
+                type="button"
+                className="tom-start-prompt-btn"
+                onClick={handleStartListening}
+                aria-label="Tap to talk to Ayush"
+              >
+                <Mic size={16} className="prompt-mic-icon" />
+                <span>Tap to Talk to Ayush 🎙️</span>
+              </button>
+              {micErrorMessage && (
+                <p className="tom-mic-error-pill">{micErrorMessage}</p>
+              )}
+            </div>
+          )}
         </div>
 
         <InteractionMenu
@@ -516,11 +595,6 @@ export default function App() {
           annoyanceCount={annoyanceCount}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          voiceMode={voiceMode}
-          setVoiceMode={setVoiceMode}
-          onPlaybackStart={handlePlaybackStart}
-          onPlaybackEnd={handlePlaybackEnd}
-          onAmplitude={handleAmplitude}
           gfName={settings.gfName}
           ayushName={settings.ayushName}
           onAyushReply={handleAyushChatReply}

@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   romanticMessagesEnabled: true,
   floatingEffectsEnabled: true,
   customModelUrl: '',
+  voiceMode: 'funny',
 };
 
 export const DEFAULT_UNLOCKS = {
@@ -110,6 +111,7 @@ export function loadRomanticSettings() {
       romanticMessagesEnabled: typeof parsed.romanticMessagesEnabled === 'boolean' ? parsed.romanticMessagesEnabled : DEFAULT_SETTINGS.romanticMessagesEnabled,
       floatingEffectsEnabled: typeof parsed.floatingEffectsEnabled === 'boolean' ? parsed.floatingEffectsEnabled : DEFAULT_SETTINGS.floatingEffectsEnabled,
       customModelUrl: sanitizedModelUrl,
+      voiceMode: ['funny', 'device', 'cloned'].includes(parsed.voiceMode) ? parsed.voiceMode : DEFAULT_SETTINGS.voiceMode,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
