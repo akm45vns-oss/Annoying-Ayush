@@ -7,13 +7,13 @@ const SETTINGS_KEY = 'annoying_ayush_romantic_settings_v1';
 const UNLOCKS_KEY = 'annoying_ayush_unlocks_v1';
 
 export const DEFAULT_SETTINGS = {
-  gfName: 'Babe',
+  gfName: 'Shristy',
   ayushName: 'Ayush',
-  anniversaryDate: '', // Format: YYYY-MM-DD
+  anniversaryDate: '2025-07-21',
   soundEnabled: true,
   romanticMessagesEnabled: true,
   floatingEffectsEnabled: true,
-  customModelUrl: '', // Optional override for custom .glb file
+  customModelUrl: '',
 };
 
 export const DEFAULT_UNLOCKS = {
