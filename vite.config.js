@@ -17,6 +17,19 @@ function apiDevServerPlugin() {
           }
           return;
         }
+
+        if (req.url && req.url.startsWith('/api/tts')) {
+          try {
+            const { handleTtsRequest } = await import('./api/tts-handler.js');
+            await handleTtsRequest(req, res);
+          } catch (err) {
+            console.error('TTS dev server error:', err);
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: 'Internal Server Error' }));
+          }
+          return;
+        }
+
         next();
       });
     }
@@ -34,6 +47,9 @@ export default defineConfig(({ mode }) => {
   if (env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = env.OPENAI_API_KEY;
   if (env.OPENAI_MODEL) process.env.OPENAI_MODEL = env.OPENAI_MODEL;
   if (env.OPENAI_BASE_URL) process.env.OPENAI_BASE_URL = env.OPENAI_BASE_URL;
+  if (env.ELEVENLABS_API_KEY) process.env.ELEVENLABS_API_KEY = env.ELEVENLABS_API_KEY;
+  if (env.ELEVENLABS_VOICE_ID) process.env.ELEVENLABS_VOICE_ID = env.ELEVENLABS_VOICE_ID;
+  if (env.ELEVENLABS_MODEL_ID) process.env.ELEVENLABS_MODEL_ID = env.ELEVENLABS_MODEL_ID;
 
   return {
     plugins: [react(), apiDevServerPlugin()],

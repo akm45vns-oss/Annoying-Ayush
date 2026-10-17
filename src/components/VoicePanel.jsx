@@ -6,19 +6,22 @@ import {
   Sparkles, 
   Volume2, 
   ShieldCheck, 
-  AlertCircle 
+  AlertCircle,
+  RotateCcw,
+  Send,
+  Edit3,
+  CheckCircle2
 } from 'lucide-react';
 import { voiceEngine } from '../utils/voiceRecorder';
+import { clonedVoiceEngine } from '../utils/clonedVoiceEngine';
+import { speechTranscriber } from '../utils/speechTranscriber';
 
 /**
- * Milestone 3 Voice Panel
- * Features:
- * - Hold to record / Tap to record
- * - Voice modes: 'funny' (Talking Tom chipmunk) vs 'original'
- * - Real-time recording timer
- * - Play Again / Stop controls
- * - Status indicators and microphone error handling
- * - Privacy notice: 100% local audio
+ * Enhanced Voice Panel with Cloned Voice Speech Pipeline & Talking Tom Repeat
+ * 
+ * Sub-modes:
+ * 1. "cloned": Speech recognition -> Transcribe -> Cloned TTS in Ayush's voice -> Lip-sync
+ * 2. "repeat": Milestone 3 instant microphone repeat with cartoon pitch-shift
  */
 export default function VoicePanel({
   voiceMode,
@@ -27,11 +30,19 @@ export default function VoicePanel({
   onPlaybackEnd = () => {},
   onAmplitude = () => {}
 }) {
+  const [pipelineMode, setPipelineMode] = useState('cloned'); // 'cloned' | 'repeat'
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribedText, setTranscribedText] = useState('');
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  const [isClonedPlaying, setIsClonedPlaying] = useState(false);
+  const [clonedVoiceStatus, setClonedVoiceStatus] = useState('ready'); // 'ready' | 'generating' | 'playing' | 'fallback'
+
+  // Milestone 3 repeat state
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasRecording, setHasRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('Hold or tap Mic to speak!');
+  const [statusMessage, setStatusMessage] = useState('Tap Mic to speak to Ayush!');
   const [errorMessage, setErrorMessage] = useState('');
 
   const timerIntervalRef = useRef(null);
@@ -40,7 +51,6 @@ export default function VoicePanel({
   const maxDurationTimeoutRef = useRef(null);
   const stopRecordingActionRef = useRef(null);
 
-  // Maximum allowed recording: 15 seconds
   const MAX_RECORD_SECONDS = 15;
 
   const startTimer = useCallback(() => {
@@ -68,6 +78,112 @@ export default function VoicePanel({
     }
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Pipeline 1: Voice Recognition & Cloned Voice Generation
+  // ---------------------------------------------------------------------------
+  const handleStartListening = () => {
+    if (isTranscribing || isGeneratingVoice || isClonedPlaying) return;
+    setErrorMessage('');
+    setIsTranscribing(true);
+    setStatusMessage('🔴 Listening to you... speak clearly!');
+
+    if (!speechTranscriber.isSupported()) {
+      setIsTranscribing(false);
+      setErrorMessage('Browser speech recognition not available. You can type your message in the box below!');
+      return;
+    }
+
+    try {
+      speechTranscriber.start(
+        (text) => {
+          setTranscribedText(text);
+          setStatusMessage('Recognizing your words... ✨');
+        },
+        (error) => {
+          setIsTranscribing(false);
+          if (error === 'not-allowed') {
+            setErrorMessage('Microphone access blocked. Tap the 🔒 lock icon in Chrome to allow microphone.');
+          } else {
+            setErrorMessage('Listening ended or no speech detected. Try again or type below!');
+          }
+        },
+        () => {
+          setIsTranscribing(false);
+          setStatusMessage('Transcription ready! Review and generate Ayush’s voice.');
+        }
+      );
+    } catch (err) {
+      setIsTranscribing(false);
+      setErrorMessage(err.message || 'Could not start microphone.');
+    }
+  };
+
+  const handleStopListening = () => {
+    speechTranscriber.stop();
+    setIsTranscribing(false);
+  };
+
+  const handleGenerateAndSpeak = async (overrideText) => {
+    const textToSpeak = (overrideText || transcribedText || '').trim();
+    if (!textToSpeak) {
+      setErrorMessage('Please speak or type a phrase first!');
+      return;
+    }
+
+    setErrorMessage('');
+    setIsGeneratingVoice(true);
+    setClonedVoiceStatus('generating');
+    setStatusMessage('Generating Ayush’s voice... ✨');
+
+    try {
+      const res = await clonedVoiceEngine.generateSpeech(textToSpeak);
+      setIsGeneratingVoice(false);
+
+      if (!res.ok && res.error) {
+        setErrorMessage(res.error);
+        setStatusMessage('Generation failed. Using device voice.');
+      } else if (res.fallbackReason === 'unconfigured') {
+        setClonedVoiceStatus('fallback');
+      } else {
+        setClonedVoiceStatus('live');
+      }
+
+      // Play audio and synchronize character mouth & gestures
+      setIsClonedPlaying(true);
+      onPlaybackStart();
+      setStatusMessage(`Speaking in ${voiceMode === 'funny' ? 'Funny Ayush 🐿️' : 'Ayush’s Voice 🎙️'}...`);
+
+      clonedVoiceEngine.playSpeech(
+        voiceMode === 'funny' ? 'funny' : 'ayush',
+        (vol) => {
+          onAmplitude(vol);
+        },
+        () => {
+          setIsClonedPlaying(false);
+          onPlaybackEnd();
+          onAmplitude(0);
+          setStatusMessage('Ayush finished speaking!');
+        }
+      );
+    } catch (err) {
+      setIsGeneratingVoice(false);
+      setIsClonedPlaying(false);
+      onPlaybackEnd();
+      setErrorMessage(err.message || 'Could not play voice.');
+    }
+  };
+
+  const handleStopClonedPlayback = () => {
+    clonedVoiceEngine.stopPlayback();
+    setIsClonedPlaying(false);
+    onPlaybackEnd();
+    onAmplitude(0);
+    setStatusMessage('Playback stopped.');
+  };
+
+  // ---------------------------------------------------------------------------
+  // Pipeline 2: Instant Microphone Repeat (Milestone 3)
+  // ---------------------------------------------------------------------------
   const startRecordingAction = async () => {
     if (isRecording || isPlaying) return;
     setErrorMessage('');
@@ -157,7 +273,6 @@ export default function VoicePanel({
       if (result) {
         setHasRecording(true);
         setStatusMessage('Ayush is repeating your words! 🎙️');
-        // Auto-play immediately (Talking Tom behavior)
         playRecordingAction();
       }
     } catch (err) {
@@ -170,7 +285,6 @@ export default function VoicePanel({
     stopRecordingActionRef.current = stopRecordingAction;
   });
 
-  // Pointer event handlers supporting both "Hold to Record" and "Tap to Record"
   const handlePointerDown = (e) => {
     e.preventDefault();
     if (isPlaying) {
@@ -178,7 +292,6 @@ export default function VoicePanel({
       return;
     }
     if (isRecording) {
-      // Tap-to-stop
       stopRecordingAction();
       return;
     }
@@ -192,11 +305,9 @@ export default function VoicePanel({
     if (!isHoldingRef.current) return;
     isHoldingRef.current = false;
     const duration = Date.now() - holdStartTimeRef.current;
-    // If held for more than 400ms, release-to-stop
     if (duration > 400 && isRecording) {
       stopRecordingAction();
     }
-    // If it was a quick tap (<400ms), we let it keep recording until the next tap or Stop!
   };
 
   const handlePointerCancel = () => {
@@ -206,130 +317,284 @@ export default function VoicePanel({
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopTimer();
       voiceEngine.cleanup();
+      clonedVoiceEngine.cleanup();
+      speechTranscriber.stop();
     };
   }, [stopTimer]);
 
   return (
     <div className="voice-panel-container">
-      {/* 1. Voice Mode Selector */}
+      {/* 1. Pipeline Selector Tabs */}
+      <div className="voice-pipeline-tabs">
+        <button
+          type="button"
+          className={`pipeline-tab-btn ${pipelineMode === 'cloned' ? 'active' : ''}`}
+          onClick={() => {
+            setPipelineMode('cloned');
+            setErrorMessage('');
+          }}
+        >
+          <Sparkles size={13} />
+          <span>Ayush Cloned Voice 🗣️</span>
+        </button>
+
+        <button
+          type="button"
+          className={`pipeline-tab-btn ${pipelineMode === 'repeat' ? 'active' : ''}`}
+          onClick={() => {
+            setPipelineMode('repeat');
+            setErrorMessage('');
+          }}
+        >
+          <Volume2 size={13} />
+          <span>Instant Repeat 🐿️</span>
+        </button>
+      </div>
+
+      {/* 2. Voice Mode Selector: Ayush Voice vs Funny Ayush */}
       <div className="voice-mode-selector">
-        <span className="mode-title">Voice:</span>
+        <span className="mode-title">Style:</span>
+        <button
+          type="button"
+          className={`voice-mode-pill ${voiceMode === 'original' || voiceMode === 'ayush' ? 'active' : ''}`}
+          onClick={() => setVoiceMode('original')}
+          title="Ayush’s natural voice"
+        >
+          <Volume2 size={14} className="mode-icon" />
+          <span>Ayush Voice 🎙️</span>
+        </button>
+
         <button
           type="button"
           className={`voice-mode-pill ${voiceMode === 'funny' ? 'active' : ''}`}
-          onClick={() => {
-            setVoiceMode('funny');
-            if (isPlaying) {
-              stopPlaybackAction();
-              setTimeout(() => playRecordingAction(), 50);
-            }
-          }}
-          title="Playful high-pitched Talking Tom cartoon voice"
+          onClick={() => setVoiceMode('funny')}
+          title="Playful cartoon chipmunk pitch-shifted voice"
         >
           <Sparkles size={14} className="mode-icon" />
-          <span>Funny 🐿️</span>
-        </button>
-
-        <button
-          type="button"
-          className={`voice-mode-pill ${voiceMode === 'original' ? 'active' : ''}`}
-          onClick={() => {
-            setVoiceMode('original');
-            if (isPlaying) {
-              stopPlaybackAction();
-              setTimeout(() => playRecordingAction(), 50);
-            }
-          }}
-          title="Play back your real unaltered voice"
-        >
-          <Volume2 size={14} className="mode-icon" />
-          <span>Original 🎙️</span>
+          <span>Funny Ayush 🐿️</span>
         </button>
       </div>
 
-      {/* 2. Recording Status and Timer */}
-      <div className="voice-status-bar">
-        {isRecording ? (
-          <div className="recording-indicator">
-            <span className="rec-dot" />
-            <span className="rec-text">Recording: {recordSeconds}s / {MAX_RECORD_SECONDS}s</span>
-          </div>
-        ) : isPlaying ? (
-          <div className="playing-indicator">
-            <span className="play-wave" />
-            <span className="play-text">Ayush is speaking...</span>
-          </div>
-        ) : (
-          <span className="status-text">{statusMessage}</span>
-        )}
-      </div>
-
-      {/* 3. Main Microphone & Playback Controls */}
-      <div className="voice-controls-row">
-        {/* Main Record Button */}
-        <button
-          type="button"
-          className={`main-mic-button ${isRecording ? 'recording' : ''}`}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerCancel}
-          aria-label={isRecording ? 'Stop recording' : 'Record voice'}
-          title={isRecording ? 'Tap or release to finish recording' : 'Hold or tap to talk'}
-        >
-          <div className="mic-icon-circle">
-            {isRecording ? (
-              <Square size={22} className="rec-stop-icon" />
+      {/* ----------------------------------------------------------------- */}
+      {/* MODE 1: CLONED VOICE SPEECH PIPELINE                              */}
+      {/* ----------------------------------------------------------------- */}
+      {pipelineMode === 'cloned' && (
+        <div className="cloned-voice-workflow">
+          {/* Status & Live Badge */}
+          <div className="voice-status-bar">
+            {isTranscribing ? (
+              <div className="recording-indicator">
+                <span className="rec-dot" />
+                <span className="rec-text">Listening to your speech...</span>
+              </div>
+            ) : isGeneratingVoice ? (
+              <div className="playing-indicator">
+                <span className="play-wave" />
+                <span className="play-text">Synthesizing Ayush’s voice...</span>
+              </div>
+            ) : isClonedPlaying ? (
+              <div className="playing-indicator">
+                <span className="play-wave" />
+                <span className="play-text">Ayush is speaking!</span>
+              </div>
             ) : (
-              <Mic size={24} className="mic-icon" />
+              <span className="status-text">{statusMessage}</span>
             )}
           </div>
-          <span className="mic-label">
-            {isRecording ? 'Stop Recording' : 'Hold or Tap to Talk'}
-          </span>
-        </button>
 
-        {/* Secondary Play Again / Stop Button (shown when recording exists) */}
-        {hasRecording && !isRecording && (
-          <button
-            type="button"
-            className={`secondary-play-button ${isPlaying ? 'playing' : ''}`}
-            onClick={isPlaying ? stopPlaybackAction : playRecordingAction}
-            title={isPlaying ? 'Stop playback' : 'Play recorded voice again'}
-          >
-            {isPlaying ? (
-              <>
+          {/* Step 1: Capture Speech / Review Transcription */}
+          <div className="transcription-box">
+            <div className="transcription-header">
+              <span className="transcription-label">
+                <Edit3 size={12} />
+                <span>What to say in Ayush’s voice:</span>
+              </span>
+              {clonedVoiceStatus === 'live' ? (
+                <span className="status-pill live-clone-pill">
+                  <CheckCircle2 size={11} />
+                  <span>Authorized Voice Clone</span>
+                </span>
+              ) : (
+                <span className="status-pill fallback-pill">
+                  <span>Device Voice Mode</span>
+                </span>
+              )}
+            </div>
+
+            <textarea
+              className="transcription-input"
+              rows={2}
+              placeholder="Tap the mic below to speak, or type any romantic message here..."
+              value={transcribedText}
+              onChange={(e) => setTranscribedText(e.target.value)}
+            />
+
+            {/* Quick Suggestions / Sample Prompts */}
+            {!transcribedText && (
+              <div className="prompt-chips-row">
+                <button
+                  type="button"
+                  className="prompt-chip"
+                  onClick={() => setTranscribedText("I love you more than all the stars, Babe! ❤️")}
+                >
+                  "I love you!" ❤️
+                </button>
+                <button
+                  type="button"
+                  className="prompt-chip"
+                  onClick={() => setTranscribedText("Who is the most beautiful girl in the world? You! 🥰")}
+                >
+                  "Most beautiful girl" 🥰
+                </button>
+                <button
+                  type="button"
+                  className="prompt-chip"
+                  onClick={() => setTranscribedText("Stop being so cute or I'm never letting you go! 🥺")}
+                >
+                  "Stop being so cute" 🥺
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons Row */}
+          <div className="voice-controls-row">
+            {/* Record / Listen Mic button */}
+            <button
+              type="button"
+              className={`main-mic-button ${isTranscribing ? 'recording' : ''}`}
+              onClick={isTranscribing ? handleStopListening : handleStartListening}
+              title={isTranscribing ? 'Stop listening' : 'Speak into microphone'}
+            >
+              <div className="mic-icon-circle">
+                {isTranscribing ? <Square size={20} /> : <Mic size={22} />}
+              </div>
+              <span className="mic-label">
+                {isTranscribing ? 'Done Listening' : 'Speak Message'}
+              </span>
+            </button>
+
+            {/* Generate & Speak in Ayush's Voice */}
+            {isClonedPlaying ? (
+              <button
+                type="button"
+                className="secondary-play-button playing"
+                onClick={handleStopClonedPlayback}
+                title="Stop voice playback"
+              >
                 <Square size={16} />
                 <span>Stop</span>
-              </>
+              </button>
             ) : (
-              <>
-                <Play size={16} />
-                <span>Play Again</span>
-              </>
+              <button
+                type="button"
+                className="secondary-play-button generate-btn"
+                disabled={!transcribedText.trim() || isGeneratingVoice}
+                onClick={() => handleGenerateAndSpeak()}
+                title="Speak text in Ayush's voice"
+              >
+                <Send size={15} />
+                <span>{isGeneratingVoice ? 'Generating...' : 'Say It! 💖'}</span>
+              </button>
             )}
-          </button>
-        )}
 
-        {/* Sample Voice Button: Allows testing chipmunk & original pitch without a mic */}
-        {!isRecording && (
-          <button
-            type="button"
-            className="sample-voice-btn"
-            onClick={handlePlaySampleVoice}
-            title="Test Funny vs Original voice without a microphone"
-          >
-            <Sparkles size={14} />
-            <span>{hasRecording ? 'Sample Voice' : 'No mic? Try Sample Voice 🎵'}</span>
-          </button>
-        )}
-      </div>
+            {/* Reset / Clear button */}
+            {transcribedText && !isClonedPlaying && (
+              <button
+                type="button"
+                className="sample-voice-btn reset-text-btn"
+                onClick={() => {
+                  setTranscribedText('');
+                  setStatusMessage('Ready for your next message.');
+                }}
+                title="Clear text"
+              >
+                <RotateCcw size={13} />
+                <span>Clear</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* 4. Error Message Banner */}
+      {/* ----------------------------------------------------------------- */}
+      {/* MODE 2: INSTANT TALKING TOM REPEAT (MILESTONE 3)                 */}
+      {/* ----------------------------------------------------------------- */}
+      {pipelineMode === 'repeat' && (
+        <div className="repeat-workflow">
+          <div className="voice-status-bar">
+            {isRecording ? (
+              <div className="recording-indicator">
+                <span className="rec-dot" />
+                <span className="rec-text">Recording: {recordSeconds}s / {MAX_RECORD_SECONDS}s</span>
+              </div>
+            ) : isPlaying ? (
+              <div className="playing-indicator">
+                <span className="play-wave" />
+                <span className="play-text">Ayush is repeating your words...</span>
+              </div>
+            ) : (
+              <span className="status-text">{statusMessage}</span>
+            )}
+          </div>
+
+          <div className="voice-controls-row">
+            <button
+              type="button"
+              className={`main-mic-button ${isRecording ? 'recording' : ''}`}
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              aria-label={isRecording ? 'Stop recording' : 'Record voice'}
+            >
+              <div className="mic-icon-circle">
+                {isRecording ? <Square size={22} /> : <Mic size={24} />}
+              </div>
+              <span className="mic-label">
+                {isRecording ? 'Stop Recording' : 'Hold or Tap to Talk'}
+              </span>
+            </button>
+
+            {hasRecording && !isRecording && (
+              <button
+                type="button"
+                className={`secondary-play-button ${isPlaying ? 'playing' : ''}`}
+                onClick={isPlaying ? stopPlaybackAction : playRecordingAction}
+              >
+                {isPlaying ? (
+                  <>
+                    <Square size={16} />
+                    <span>Stop</span>
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} />
+                    <span>Play Again</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {!isRecording && (
+              <button
+                type="button"
+                className="sample-voice-btn"
+                onClick={handlePlaySampleVoice}
+                title="Test Funny vs Original voice without a microphone"
+              >
+                <Sparkles size={14} />
+                <span>{hasRecording ? 'Sample Voice' : 'No mic? Try Sample Voice 🎵'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Error Message Banner */}
       {errorMessage && (
         <div className="voice-error-banner" role="alert">
           <AlertCircle size={14} />
@@ -337,10 +602,10 @@ export default function VoicePanel({
         </div>
       )}
 
-      {/* 5. Privacy Notice */}
+      {/* Privacy Notice */}
       <div className="voice-privacy-note">
         <ShieldCheck size={12} className="privacy-icon" />
-        <span>100% Private • Audio processed locally in your browser</span>
+        <span>100% Private • Authorized voice model with secure server-side tokens</span>
       </div>
     </div>
   );
