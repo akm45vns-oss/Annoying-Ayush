@@ -293,11 +293,18 @@ class ClonedVoiceEngine {
 
       this.isPlaying = true;
 
+      if (this.mouthInterval) {
+        clearInterval(this.mouthInterval);
+      }
+
       // Simulated volume pulse for mouth animation
       const startTime = Date.now();
-      const interval = setInterval(() => {
+      this.mouthInterval = setInterval(() => {
         if (!this.isPlaying) {
-          clearInterval(interval);
+          if (this.mouthInterval) {
+            clearInterval(this.mouthInterval);
+            this.mouthInterval = null;
+          }
           onAmplitude(0);
           return;
         }
@@ -308,14 +315,20 @@ class ClonedVoiceEngine {
 
       utterance.onend = () => {
         this.isPlaying = false;
-        clearInterval(interval);
+        if (this.mouthInterval) {
+          clearInterval(this.mouthInterval);
+          this.mouthInterval = null;
+        }
         onAmplitude(0);
         onEnded();
       };
 
       utterance.onerror = () => {
         this.isPlaying = false;
-        clearInterval(interval);
+        if (this.mouthInterval) {
+          clearInterval(this.mouthInterval);
+          this.mouthInterval = null;
+        }
         onAmplitude(0);
         onEnded();
       };
@@ -324,8 +337,131 @@ class ClonedVoiceEngine {
     }
   }
 
+  /**
+   * Directly speak text via browser SpeechSynthesis with realistic mouth animation
+   */
+  speakDirectText(text, mode = 'funny', onAmplitude = () => {}, onEnded = () => {}) {
+    this.stopPlayback();
+    this.lastGeneratedText = text;
+    this.cachedAudioBuffer = null;
+
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      onEnded();
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+
+      if (mode === 'funny') {
+        utterance.pitch = 1.6;
+        utterance.rate = 1.35;
+      } else {
+        utterance.pitch = 1.0;
+        utterance.rate = 1.0;
+      }
+
+      this.isPlaying = true;
+
+      const startTime = Date.now();
+      this.mouthInterval = setInterval(() => {
+        if (!this.isPlaying) {
+          if (this.mouthInterval) {
+            clearInterval(this.mouthInterval);
+            this.mouthInterval = null;
+          }
+          onAmplitude(0);
+          return;
+        }
+        const t = (Date.now() - startTime) / 1000;
+        const simulatedVol = Math.abs(Math.sin(t * 14)) * 0.7;
+        onAmplitude(simulatedVol);
+      }, 50);
+
+      utterance.onend = () => {
+        this.isPlaying = false;
+        if (this.mouthInterval) {
+          clearInterval(this.mouthInterval);
+          this.mouthInterval = null;
+        }
+        onAmplitude(0);
+        onEnded();
+      };
+
+      utterance.onerror = () => {
+        this.isPlaying = false;
+        if (this.mouthInterval) {
+          clearInterval(this.mouthInterval);
+          this.mouthInterval = null;
+        }
+        onAmplitude(0);
+        onEnded();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      this.isPlaying = false;
+      onEnded();
+    }
+  }
+
+  /**
+   * High-level routing for all voice modes:
+   * - 'funny': Instant cartoon chipmunk repeat (Zero network latency)
+   * - 'device': Instant device speech synthesis (Zero network latency)
+   * - 'cloned': Authorized server-side cloned voice (with graceful fallback to device)
+   */
+  async speakPhraseWithMode(text, mode = 'funny', {
+    onStart = () => {},
+    onAmplitude = () => {},
+    onEnded = () => {},
+    onFallback = () => {}
+  } = {}) {
+    const cleanText = (text || '').trim();
+    if (!cleanText) {
+      onEnded();
+      return;
+    }
+
+    if (mode === 'funny' || mode === 'device') {
+      onStart();
+      this.speakDirectText(cleanText, mode, onAmplitude, onEnded);
+      return;
+    }
+
+    if (mode === 'cloned') {
+      try {
+        const res = await this.generateSpeech(cleanText);
+        if (res.cancelled) {
+          onEnded();
+          return;
+        }
+
+        onStart();
+
+        if (res.isCloned && this.hasAudio()) {
+          this.playSpeech('ayush', onAmplitude, onEnded);
+        } else {
+          // Unconfigured or error: inform caller and use device voice fallback
+          onFallback(res.fallbackReason || 'unconfigured');
+          this.speakDirectText(cleanText, 'device', onAmplitude, onEnded);
+        }
+      } catch {
+        onStart();
+        onFallback('error');
+        this.speakDirectText(cleanText, 'device', onAmplitude, onEnded);
+      }
+    }
+  }
+
   stopPlayback() {
     this.cancelGeneration();
+
+    if (this.mouthInterval) {
+      clearInterval(this.mouthInterval);
+      this.mouthInterval = null;
+    }
 
     if (this.currentSource) {
       try {
@@ -361,3 +497,4 @@ class ClonedVoiceEngine {
 }
 
 export const clonedVoiceEngine = new ClonedVoiceEngine();
+

@@ -14,6 +14,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
+import { talkingTomController, LISTENING_STATES } from '../utils/talkingTomController';
 import VoicePanel from './VoicePanel';
 import ChatPanel from './ChatPanel';
 
@@ -35,6 +36,20 @@ export default function InteractionMenu({
   ayushName = 'Ayush',
   onAyushReply = () => {}
 }) {
+  const [isListeningActive, setIsListeningActive] = React.useState(
+    () => talkingTomController.isExplicitlyEnabled && talkingTomController.state === LISTENING_STATES.LISTENING
+  );
+
+  React.useEffect(() => {
+    const handleState = (state) => {
+      setIsListeningActive(talkingTomController.isExplicitlyEnabled && state === LISTENING_STATES.LISTENING);
+    };
+    talkingTomController.addStateListener(handleState);
+    return () => {
+      talkingTomController.removeStateListener(handleState);
+    };
+  }, []);
+
   const actions = [
     {
       id: 'kiss',
@@ -88,6 +103,7 @@ export default function InteractionMenu({
 
   const getMoodLabel = () => {
     if (activeTab === 'chat') return '💬 Chatting with you';
+    if (isListeningActive) return '🎙️ Listening to you...';
     if (annoyanceCount >= 5) return '😤 Annoyance: High!';
     if (annoyanceCount >= 3) return '⚡ Teased!';
     if (currentAction === 'kiss') return '💋 Sending Kisses';

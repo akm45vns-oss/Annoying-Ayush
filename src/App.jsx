@@ -8,6 +8,7 @@ import SecretLetterModal from './components/SecretLetterModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
 import { clonedVoiceEngine } from './utils/clonedVoiceEngine';
+import { talkingTomController } from './utils/talkingTomController';
 import { 
   getTimeAwareGreeting, 
   formatDialogue,
@@ -151,9 +152,50 @@ export default function App() {
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch {}
+      didStop = true;
     }
+    talkingTomController.setSpeaking(false, 300);
     if (didStop) setTalkingVolume(0);
   }, []);
+
+  // Talking Tom Continuous Repeat Loop:
+  // When user finishes a phrase, Ayush repeats it using the active voiceMode,
+  // then resumes listening after a feedback-preventing cooldown.
+  useEffect(() => {
+    talkingTomController.onPhraseFinalized = (phrase) => {
+      showSpeech(phrase, 4200);
+      talkingTomController.setSpeaking(true);
+
+      clonedVoiceEngine.speakPhraseWithMode(phrase, voiceMode, {
+        onStart: () => {
+          handlePlaybackStart();
+        },
+        onAmplitude: (vol) => {
+          handleAmplitude(vol);
+        },
+        onEnded: () => {
+          handlePlaybackEnd();
+          talkingTomController.setSpeaking(false, 450);
+        },
+        onFallback: () => {
+          // Handled within clonedVoiceEngine
+        }
+      });
+    };
+
+    return () => {
+      talkingTomController.onPhraseFinalized = null;
+    };
+  }, [voiceMode, showSpeech, handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
+
+  // Pause continuous repeat during AI Chat to prevent audio competition
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      talkingTomController.pauseListening();
+    } else {
+      talkingTomController.resumeListening();
+    }
+  }, [activeTab]);
 
   // Reset character and state cleanly
   const resetToIdle = useCallback(() => {
@@ -161,6 +203,7 @@ export default function App() {
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
     if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
 
+    talkingTomController.stopListening();
     voiceEngine.cleanup();
     clonedVoiceEngine.cleanup();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -423,6 +466,7 @@ export default function App() {
       if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
       if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
       if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+      talkingTomController.destroy();
       voiceEngine.cleanup();
       clonedVoiceEngine.cleanup();
     };
