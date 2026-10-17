@@ -84,7 +84,8 @@ export default function AyushScene({
   isHovered,
   setIsHovered,
   heartBurst = 0,
-  talkingVolume = 0
+  talkingVolume = 0,
+  floatingEffectsEnabled = true
 }) {
   return (
     <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
@@ -115,8 +116,8 @@ export default function AyushScene({
 
         {/* 3D Studio Stage & Atmosphere */}
         <StudioStage />
-        <FloatingParticles />
-        <FloatingHearts burstTrigger={heartBurst} />
+        {floatingEffectsEnabled && <FloatingParticles />}
+        {floatingEffectsEnabled && <FloatingHearts burstTrigger={heartBurst} />}
 
         {/* Central Cartoon Ayush Character */}
         <AyushCharacter

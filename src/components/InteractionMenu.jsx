@@ -5,11 +5,12 @@ import {
   Smile, 
   Volume2, 
   VolumeX,
-  Music,
   Mail,
   Sparkles,
   Flame,
-  Mic
+  Mic,
+  HeartHandshake,
+  Moon
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 import VoicePanel from './VoicePanel';
@@ -31,33 +32,41 @@ export default function InteractionMenu({
 }) {
   const actions = [
     {
-      id: 'boop',
-      label: 'Boop!',
-      sublabel: 'Nose tap',
-      icon: Sparkles,
-      color: '#ff6b8b',
-      sound: () => soundManager.playBoop(),
-    },
-    {
       id: 'kiss',
-      label: 'Blow Kiss',
+      label: 'Kiss',
       sublabel: 'Mwah! 💋',
       icon: Heart,
       color: '#e91e63',
       sound: () => soundManager.playKiss(),
     },
     {
-      id: 'dance',
-      label: 'Dance',
-      sublabel: 'Groove!',
-      icon: Music,
-      color: '#8e24aa',
-      sound: () => soundManager.playDanceBeat(),
+      id: 'hug',
+      label: 'Hug',
+      sublabel: 'Warm embrace',
+      icon: HeartHandshake,
+      color: '#ff6b8b',
+      sound: () => soundManager.playHug(),
+    },
+    {
+      id: 'blush',
+      label: 'Blush',
+      sublabel: 'Rosy cheeks',
+      icon: Sparkles,
+      color: '#f06292',
+      sound: () => soundManager.playShyChime(),
+    },
+    {
+      id: 'cuddle',
+      label: 'Cuddle',
+      sublabel: 'Cozy snuggles',
+      icon: Moon,
+      color: '#ba68c8',
+      sound: () => soundManager.playCuddleHum(),
     },
     {
       id: 'laugh',
-      label: 'Make Laugh',
-      sublabel: 'Giggles',
+      label: 'Tease',
+      sublabel: 'Giggles & fun',
       icon: Smile,
       color: '#ffa000',
       sound: () => soundManager.playLaugh(),
@@ -65,7 +74,7 @@ export default function InteractionMenu({
     {
       id: 'loveNote',
       label: 'Love Note',
-      sublabel: 'Affection',
+      sublabel: 'Sweet words',
       icon: Mail,
       color: '#00acc1',
       sound: () => soundManager.playChime(),
@@ -75,10 +84,12 @@ export default function InteractionMenu({
   const getMoodLabel = () => {
     if (annoyanceCount >= 5) return '😤 Annoyance: High!';
     if (annoyanceCount >= 3) return '⚡ Teased!';
+    if (currentAction === 'kiss') return '💋 Sending Kisses';
+    if (currentAction === 'hug') return '🧸 Big Warm Hug';
+    if (currentAction === 'blush') return '😳 Blushing Pink';
+    if (currentAction === 'cuddle') return '🌸 Cozy Snuggles';
+    if (currentAction === 'laugh') return '😆 Giggling!';
     if (currentAction === 'dance') return '🕺 Grooving!';
-    if (currentAction === 'kiss') return '💋 Sending Love';
-    if (currentAction === 'laugh') return '😆 Laughing!';
-    if (currentAction === 'hug') return '🧸 Cuddling!';
     if (currentAction === 'surprised') return '😲 Surprised!';
     if (currentAction === 'boop') return '👃 Booped!';
     if (currentAction === 'talking') return '🎙️ Repeating!';
@@ -87,7 +98,7 @@ export default function InteractionMenu({
 
   return (
     <div className="interaction-menu-container">
-      {/* 1. Category Switcher Tabs: Play Actions vs Voice Repeat */}
+      {/* 1. Category Switcher Tabs: Play & Tease vs Voice Repeat */}
       <div className="menu-nav-tabs">
         <button
           type="button"
@@ -98,7 +109,7 @@ export default function InteractionMenu({
           }}
         >
           <Sparkles size={14} />
-          <span>Play & Tease</span>
+          <span>Play & Romance 💖</span>
         </button>
 
         <button
@@ -117,7 +128,7 @@ export default function InteractionMenu({
       {/* 2. Secondary Meta Controls Bar */}
       <div className="menu-meta-bar">
         <button 
-          type="button"
+          type="button" 
           className={`meta-button ${!isMuted ? 'sound-active' : ''}`}
           onClick={onToggleMute}
           title={isMuted ? "Unmute sounds" : "Mute sounds"}
@@ -132,7 +143,7 @@ export default function InteractionMenu({
         </span>
 
         <button 
-          type="button"
+          type="button" 
           className="meta-button reset-btn"
           onClick={() => {
             soundManager.playPop();
@@ -147,7 +158,7 @@ export default function InteractionMenu({
 
       {/* 3. Panel Content based on Active Tab */}
       {activeTab === 'play' ? (
-        <div className="action-buttons-grid action-buttons-5">
+        <div className="action-buttons-grid action-buttons-6">
           {actions.map((act) => {
             const Icon = act.icon;
             const isActive = currentAction === act.id;
@@ -163,7 +174,7 @@ export default function InteractionMenu({
                 }}
               >
                 <div className="btn-icon-wrapper">
-                  <Icon size={20} className="btn-icon" />
+                  <Icon size={19} className="btn-icon" />
                 </div>
                 <div className="btn-label-group">
                   <span className="btn-label">{act.label}</span>

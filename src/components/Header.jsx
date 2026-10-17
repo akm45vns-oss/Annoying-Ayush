@@ -1,9 +1,37 @@
-import React, { useState } from 'react';
-import { Heart, Info, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Heart, Info, X, Settings } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
-export default function Header() {
+export default function Header({
+  onOpenSettings,
+  onUnlockSecretHeart,
+  daysTogether = null,
+  gfName = 'Babe',
+  ayushName = 'Ayush'
+}) {
   const [showInfo, setShowInfo] = useState(false);
+  const heartTapsRef = useRef(0);
+  const heartResetTimerRef = useRef(null);
+  const [heartBounce, setHeartBounce] = useState(false);
+
+  const handleHeartClick = () => {
+    soundManager.playPop();
+    setHeartBounce(true);
+    setTimeout(() => setHeartBounce(false), 300);
+
+    if (heartResetTimerRef.current) clearTimeout(heartResetTimerRef.current);
+    heartResetTimerRef.current = setTimeout(() => {
+      heartTapsRef.current = 0;
+    }, 3500);
+
+    heartTapsRef.current += 1;
+    if (heartTapsRef.current >= 5) {
+      heartTapsRef.current = 0;
+      if (onUnlockSecretHeart) {
+        onUnlockSecretHeart();
+      }
+    }
+  };
 
   return (
     <header className="game-header">
@@ -11,51 +39,91 @@ export default function Header() {
         <div className="title-group">
           <div className="title-row">
             <h1 className="game-title">
-              Annoying Ayush <span className="heart-pulse">💗</span>
+              Annoying Ayush{' '}
+              <button
+                type="button"
+                className={`heart-secret-btn ${heartBounce ? 'tapped' : ''}`}
+                onClick={handleHeartClick}
+                title="Tap my heart! 💖"
+                aria-label="Secret heart button"
+              >
+                <span className="heart-pulse">💗</span>
+              </button>
             </h1>
-            <button 
-              className="info-toggle-btn" 
-              onClick={() => {
-                soundManager.playPop();
-                setShowInfo(!showInfo);
-              }}
-              title="About this game"
-            >
-              <Info size={18} />
-            </button>
+
+            <div className="header-actions">
+              <button 
+                type="button"
+                className="icon-action-btn settings-toggle-btn" 
+                onClick={() => {
+                  soundManager.playPop();
+                  if (onOpenSettings) onOpenSettings();
+                }}
+                title="Personalize settings"
+                aria-label="Open settings"
+              >
+                <Settings size={18} />
+              </button>
+
+              <button 
+                type="button"
+                className="icon-action-btn info-toggle-btn" 
+                onClick={() => {
+                  soundManager.playPop();
+                  setShowInfo(!showInfo);
+                }}
+                title="About this game"
+                aria-label="About this game"
+              >
+                <Info size={18} />
+              </button>
+            </div>
           </div>
-          <p className="game-subtitle">Your personal pocket cutie • Always ready to annoy you!</p>
+          <p className="game-subtitle">
+            {ayushName}'s pocket avatar • Dedicated to {gfName} 💕
+          </p>
         </div>
 
-        <div className="status-pill">
+        <div className="status-pill" onClick={handleHeartClick} style={{ cursor: 'pointer' }}>
           <Heart size={14} className="status-heart" />
-          <span>Love Level: 100% 💕</span>
+          <span>
+            {daysTogether !== null 
+              ? `Day ${daysTogether} Together 💕` 
+              : 'Love Level: 100% 💕'}
+          </span>
         </div>
       </div>
 
       {showInfo && (
         <div className="info-modal-backdrop" onClick={() => setShowInfo(false)}>
           <div className="info-modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setShowInfo(false)}>
+            <button 
+              type="button" 
+              className="modal-close-btn" 
+              onClick={() => setShowInfo(false)}
+              aria-label="Close info"
+            >
               <X size={18} />
             </button>
             <div className="modal-heart-icon">💖</div>
-            <h3>Hey Beautiful! 🥰</h3>
+            <h3>Hey {gfName}! 🥰</h3>
             <p>
               I made this game just for you. You can tap on me, tease me, poke me, 
-              or make me blow kisses whenever you miss me!
+              blow kisses, hug, cuddle, and blush whenever you miss me!
             </p>
             <p className="modal-subtext">
-              P.S. In upcoming milestones, you can talk to me and I will repeat your words in funny voices! 🎙️
+              ✨ <strong>Tip:</strong> Tap the microphone tab to talk to me and hear me repeat in funny voices, 
+              or tap ⚙️ settings to customize names and dates!
             </p>
             <button 
+              type="button"
               className="modal-action-btn"
               onClick={() => {
                 soundManager.playChime();
                 setShowInfo(false);
               }}
             >
-              Play With Ayush! 💕
+              Play With {ayushName}! 💕
             </button>
           </div>
         </div>

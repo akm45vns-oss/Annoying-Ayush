@@ -3,114 +3,90 @@ import Header from './components/Header';
 import AyushScene from './components/AyushScene';
 import SpeechBubble from './components/SpeechBubble';
 import InteractionMenu from './components/InteractionMenu';
+import RomanticSettingsModal from './components/RomanticSettingsModal';
+import SecretLetterModal from './components/SecretLetterModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
-
-// Curated Dialogue Pools
-const GREETING_DIALOGUES = [
-  "Hey beautiful! Ready to play? 🥰",
-  "Look who's here! Tap me anywhere 😜",
-  "I was just thinking about you! 💕",
-];
-
-const HEAD_TAP_DIALOGUES = [
-  "Hey! Watch the hair, I spent 15 minutes styling it! 💇‍♂️😂",
-  "Bonk! You tapped my forehead! Brain full of you! 🧠💖",
-  "Head pats? Okay fine... you're allowed because you're cute 🥰",
-  "Oof! Surprise attack on my head! 🙈",
-];
-
-const CHEEK_TAP_DIALOGUES = [
-  "Hey! My cheeks are not mochi! ...Okay maybe they are! 🥟🥰",
-  "Squish! You really like poking my cheeks, don't you? 😜",
-  "Cheek pinch attack! Now I'm blushing pink! 😳",
-  "Hehe that tickles right there! 🌸",
-];
-
-const NOSE_BOOP_DIALOGUES = [
-  "BOOP! Nose access granted! 👃✨",
-  "Hey! Did you just boop my snoot?! 😆",
-  "Boop detected! System rebooting with 100% love! 💖",
-  "Beep boop! Only you are allowed to do that! 🥰",
-];
-
-const BODY_TAP_DIALOGUES = [
-  "Eeep! That tickles! Stopppp it! 😆✨",
-  "Poke me again and I will send you 50 voice notes! 🎙️",
-  "Tickle tickle! Can't keep your hands off me, huh? 🙈",
-  "Bouncing right back into your heart! ❤️",
-];
-
-const ANNOYED_DIALOGUES = [
-  "Ayush.exe has stopped being serious! 😤😂",
-  "Okay, okay, I surrender! Stoppp poking! 🏳️😆",
-  "You did that on purpose, didn't you? 😜",
-  "Fine, one more hug. But that's it! 🙈❤️",
-  "Why must you tease me so much?! (Secretly love it) 🥺",
-];
-
-const KISS_DIALOGUES = [
-  "MWAHHH! 💋 Sending that kiss directly to your cheek!",
-  "Catch! That's 10,000 kisses compressed into one! 😘✨",
-  "One kiss isn't enough, but it's a good start! 💖",
-  "Flying kiss delivered safely! Check your heart! 💌",
-];
-
-const DANCE_DIALOGUES = [
-  "Look at these moves! Strictly choreographed for you! 🕺✨",
-  "Music in my heart, you in my thoughts! Let's groove! 🎶",
-  "Rate my dancing from 10 to 10! 😜",
-  "Dancing like nobody's watching except my favorite girl! 💃🕺",
-];
-
-const LAUGH_DIALOGUES = [
-  "Hahaha! Stop it, you're making me giggle like crazy! 🤣✨",
-  "Hehehe! That tickles so much! I can't breathe! 😆",
-  "You always know how to make me laugh! 🥰",
-  "My stomach hurts from laughing with you! 💖",
-];
-
-const LOVE_NOTE_DIALOGUES = [
-  "This little character was made just for you. ❤️",
-  "Out of everyone in the world, I chose you to annoy forever! 🌍✨",
-  "Every second making you smile is my favorite second. 🌸",
-  "Reminder: You are my dream girl and my favorite notification! 📱💌",
-  "You're cute, you're sweet, and you're stuck with me! 🥰",
-];
-
-const HUG_DIALOGUES = [
-  "Aww, are you holding me? Don't let go! 🧸❤️",
-  "Big warm virtual hug locked in! Squeeeeze! 🥰✨",
-  "I wish I could wrap you in this hug in real life right now! 💖",
-  "Warm cuddles mode activated! You're so cozy! 🌸",
-];
+import { 
+  getTimeAwareGreeting, 
+  formatDialogue,
+  DIALOGUE_POOLS 
+} from './utils/dialoguePools';
+import {
+  loadRomanticSettings,
+  saveRomanticSettings,
+  loadUnlocks,
+  saveUnlocks,
+  resetAllSettingsAndUnlocks,
+  calculateDaysTogether,
+  DEFAULT_SETTINGS
+} from './utils/romanticSettings';
 
 export default function App() {
+  // Settings & Unlocks (100% local persistence)
+  const [settings, setSettings] = useState(() => loadRomanticSettings());
+  const [unlocks, setUnlocks] = useState(() => loadUnlocks());
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSecretLetterOpen, setIsSecretLetterOpen] = useState(false);
+  const [unlockReason, setUnlockReason] = useState('secretHeart');
+
+  // Animation & Character State
   const [currentAction, setCurrentAction] = useState('idle');
-  const [speechText, setSpeechText] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
+  const [speechText, setSpeechText] = useState(() => (
+    settings.romanticMessagesEnabled 
+      ? getTimeAwareGreeting(settings.gfName, settings.ayushName)
+      : ''
+  ));
+  const isMuted = !settings.soundEnabled;
   const [isHovered, setIsHovered] = useState(false);
   const [heartBurst, setHeartBurst] = useState(0);
   const [annoyanceCount, setAnnoyanceCount] = useState(0);
 
-  // Milestone 3: Voice repeat state
+  // Milestone 3: Voice repeat state (preserved intact)
   const [activeTab, setActiveTab] = useState('play'); // 'play' | 'voice'
   const [voiceMode, setVoiceMode] = useState('funny'); // 'funny' | 'original'
   const [talkingVolume, setTalkingVolume] = useState(0);
 
+  // Secret combo buffer
+  const comboBufferRef = useRef([]);
   const actionTimeoutRef = useRef(null);
   const speechTimeoutRef = useRef(null);
   const tapCounterRef = useRef(0);
   const tapResetTimerRef = useRef(null);
+  const lastQuoteRef = useRef('');
+
+  // Keep soundManager mute state synced with settings
+  useEffect(() => {
+    soundManager.setMuted(!settings.soundEnabled);
+  }, [settings.soundEnabled]);
+
+  // Auto-dismiss initial greeting after 4.2 seconds
+  useEffect(() => {
+    speechTimeoutRef.current = setTimeout(() => {
+      setSpeechText('');
+    }, 4200);
+  }, []);
+
+  // Helper to get non-repetitive dialogue formatted with names
+  const getNextDialogue = useCallback((category) => {
+    const list = DIALOGUE_POOLS[category] || DIALOGUE_POOLS.compliments;
+    const candidates = list.filter((q) => q !== lastQuoteRef.current);
+    const chosen = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : list[0];
+    lastQuoteRef.current = chosen;
+    return formatDialogue(chosen, settings.gfName, settings.ayushName);
+  }, [settings.gfName, settings.ayushName]);
 
   // Helper to display a temporary dialogue toast that auto-dismisses
   const showSpeech = useCallback((text, durationMs = 3800) => {
+    if (!settings.romanticMessagesEnabled) return;
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
     setSpeechText(text);
     speechTimeoutRef.current = setTimeout(() => {
       setSpeechText('');
     }, durationMs);
-  }, []);
+  }, [settings.romanticMessagesEnabled]);
 
   const dismissSpeech = useCallback(() => {
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
@@ -124,6 +100,27 @@ export default function App() {
       setCurrentAction('idle');
     }, durationMs);
   }, []);
+
+  // Check secret combo sequence (kiss -> hug -> blush)
+  const recordComboAction = useCallback((actionId) => {
+    const nextBuffer = [...comboBufferRef.current, actionId].slice(-3);
+    comboBufferRef.current = nextBuffer;
+
+    if (
+      nextBuffer.length === 3 &&
+      nextBuffer[0] === 'kiss' &&
+      nextBuffer[1] === 'hug' &&
+      nextBuffer[2] === 'blush'
+    ) {
+      soundManager.playFanfare();
+      const updatedUnlocks = { ...unlocks, comboUnlocked: true };
+      setUnlocks(updatedUnlocks);
+      saveUnlocks(updatedUnlocks);
+      setUnlockReason('combo');
+      setIsSecretLetterOpen(true);
+      comboBufferRef.current = [];
+    }
+  }, [unlocks]);
 
   // Voice playback lifecycle events
   const handlePlaybackStart = useCallback(() => {
@@ -158,18 +155,30 @@ export default function App() {
     setTalkingVolume(0);
     tapCounterRef.current = 0;
     setAnnoyanceCount(0);
+    comboBufferRef.current = [];
     setCurrentAction('idle');
     setHeartBurst(0);
-    showSpeech("All reset! What's next? 😊", 2400);
-  }, [showSpeech]);
+    showSpeech(
+      formatDialogue("All reset! What should we do now, {gfName}? 😊", settings.gfName, settings.ayushName),
+      2600
+    );
+  }, [settings.gfName, settings.ayushName, showSpeech]);
 
-  // Track rapid taps for annoyance escalation
+  // Track rapid taps for mock-annoyed escalation & stopping reaction
   const handleAnnoyanceTap = useCallback(() => {
     if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+    
+    // Distinct reaction for stopping after rapid taps
     tapResetTimerRef.current = setTimeout(() => {
+      if (tapCounterRef.current >= 3) {
+        showSpeech(
+          formatDialogue("Phew, safe now... but I secretly loved the attention, {gfName}! 🥺💕", settings.gfName, settings.ayushName),
+          3200
+        );
+      }
       tapCounterRef.current = 0;
       setAnnoyanceCount(0);
-    }, 2200);
+    }, 2400);
 
     tapCounterRef.current += 1;
     const currentTaps = tapCounterRef.current;
@@ -182,13 +191,13 @@ export default function App() {
       interruptVoiceIfPlaying();
       soundManager.playAnnoyedPout();
       setCurrentAction('annoyed');
-      const quote = ANNOYED_DIALOGUES[Math.floor(Math.random() * ANNOYED_DIALOGUES.length)];
+      const quote = getNextDialogue('mockAnnoyed');
       showSpeech(quote, 3400);
       scheduleReturnToIdle(3400);
       return true;
     }
     return false;
-  }, [interruptVoiceIfPlaying, scheduleReturnToIdle, showSpeech]);
+  }, [getNextDialogue, interruptVoiceIfPlaying, scheduleReturnToIdle, settings.gfName, settings.ayushName, showSpeech]);
 
   // Main Action trigger (buttons)
   const triggerAction = useCallback((actionId) => {
@@ -196,30 +205,67 @@ export default function App() {
     if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
     setCurrentAction(actionId);
 
-    if (actionId === 'boop') {
-      const quote = NOSE_BOOP_DIALOGUES[Math.floor(Math.random() * NOSE_BOOP_DIALOGUES.length)];
-      showSpeech(quote, 2800);
-      scheduleReturnToIdle(2600);
-    } else if (actionId === 'kiss') {
-      setHeartBurst(b => b + 1);
-      const quote = KISS_DIALOGUES[Math.floor(Math.random() * KISS_DIALOGUES.length)];
+    // Record combo progression
+    recordComboAction(actionId);
+
+    if (actionId === 'kiss') {
+      if (settings.floatingEffectsEnabled) {
+        setHeartBurst((b) => b + 1);
+      }
+      const quote = getNextDialogue('kiss');
       showSpeech(quote, 3400);
       scheduleReturnToIdle(3200);
-    } else if (actionId === 'dance') {
-      const quote = DANCE_DIALOGUES[Math.floor(Math.random() * DANCE_DIALOGUES.length)];
-      showSpeech(quote, 3800);
-      scheduleReturnToIdle(4000);
+    } else if (actionId === 'hug') {
+      if (settings.floatingEffectsEnabled) {
+        setHeartBurst((b) => b + 1);
+      }
+      const quote = getNextDialogue('hug');
+      showSpeech(quote, 3600);
+      scheduleReturnToIdle(3400);
+    } else if (actionId === 'blush') {
+      const quote = getNextDialogue('blush');
+      showSpeech(quote, 3200);
+      scheduleReturnToIdle(3200);
+    } else if (actionId === 'cuddle') {
+      if (settings.floatingEffectsEnabled) {
+        setHeartBurst((b) => b + 1);
+      }
+      const quote = getNextDialogue('cuddle');
+      showSpeech(quote, 3600);
+      scheduleReturnToIdle(3600);
     } else if (actionId === 'laugh') {
-      const quote = LAUGH_DIALOGUES[Math.floor(Math.random() * LAUGH_DIALOGUES.length)];
+      handleAnnoyanceTap();
+      const quote = getNextDialogue('teasing');
       showSpeech(quote, 3200);
       scheduleReturnToIdle(3200);
     } else if (actionId === 'loveNote') {
-      setHeartBurst(b => b + 1);
-      const quote = LOVE_NOTE_DIALOGUES[Math.floor(Math.random() * LOVE_NOTE_DIALOGUES.length)];
-      showSpeech(quote, 3600);
+      if (settings.floatingEffectsEnabled) {
+        setHeartBurst((b) => b + 1);
+      }
+      const quote = getNextDialogue('loveNotes');
+      showSpeech(quote, 4000);
       scheduleReturnToIdle(3600);
+    } else if (actionId === 'boop') {
+      showSpeech(getNextDialogue('teasing'), 2800);
+      scheduleReturnToIdle(2600);
+    } else if (actionId === 'dance') {
+      showSpeech(
+        formatDialogue("Look at these moves, {gfName}! Strictly for you! 🕺✨", settings.gfName, settings.ayushName),
+        3800
+      );
+      scheduleReturnToIdle(4000);
     }
-  }, [interruptVoiceIfPlaying, scheduleReturnToIdle, showSpeech]);
+  }, [
+    getNextDialogue,
+    handleAnnoyanceTap,
+    interruptVoiceIfPlaying,
+    recordComboAction,
+    scheduleReturnToIdle,
+    settings.floatingEffectsEnabled,
+    settings.gfName,
+    settings.ayushName,
+    showSpeech
+  ]);
 
   // Direct 3D Character Tap handling
   const handleCharacterTap = useCallback((part) => {
@@ -230,8 +276,11 @@ export default function App() {
       // Warm Hug
       soundManager.playHug();
       setCurrentAction('hug');
-      setHeartBurst(b => b + 1);
-      const quote = HUG_DIALOGUES[Math.floor(Math.random() * HUG_DIALOGUES.length)];
+      recordComboAction('hug');
+      if (settings.floatingEffectsEnabled) {
+        setHeartBurst((b) => b + 1);
+      }
+      const quote = getNextDialogue('hug');
       showSpeech(quote, 3600);
       scheduleReturnToIdle(3600);
       return;
@@ -244,50 +293,96 @@ export default function App() {
     if (part === 'head') {
       soundManager.playBoing();
       setCurrentAction('surprised');
-      const quote = HEAD_TAP_DIALOGUES[Math.floor(Math.random() * HEAD_TAP_DIALOGUES.length)];
+      const quote = formatDialogue(
+        "Bonk! You tapped my forehead! Brain 100% full of {gfName}! 🧠💖",
+        settings.gfName,
+        settings.ayushName
+      );
       showSpeech(quote, 2800);
       scheduleReturnToIdle(2800);
     } else if (part === 'cheek') {
-      soundManager.playPop();
-      setCurrentAction('happy');
-      const quote = CHEEK_TAP_DIALOGUES[Math.floor(Math.random() * CHEEK_TAP_DIALOGUES.length)];
-      showSpeech(quote, 2600);
-      scheduleReturnToIdle(2600);
+      soundManager.playShyChime();
+      setCurrentAction('blush');
+      recordComboAction('blush');
+      const quote = getNextDialogue('blush');
+      showSpeech(quote, 2800);
+      scheduleReturnToIdle(2800);
     } else if (part === 'nose') {
       soundManager.playBoop();
       setCurrentAction('boop');
-      const quote = NOSE_BOOP_DIALOGUES[Math.floor(Math.random() * NOSE_BOOP_DIALOGUES.length)];
+      const quote = formatDialogue("BOOP! Only {gfName} is authorized to do that! 👃✨", settings.gfName, settings.ayushName);
       showSpeech(quote, 2500);
       scheduleReturnToIdle(2500);
     } else {
       // Body / Torso
       soundManager.playPop();
       setCurrentAction('tapReaction');
-      const quote = BODY_TAP_DIALOGUES[Math.floor(Math.random() * BODY_TAP_DIALOGUES.length)];
-      showSpeech(quote, 2500);
+      const quote = getNextDialogue('teasing');
+      showSpeech(quote, 2600);
       scheduleReturnToIdle(2500);
     }
-  }, [handleAnnoyanceTap, interruptVoiceIfPlaying, scheduleReturnToIdle, showSpeech]);
+  }, [
+    getNextDialogue,
+    handleAnnoyanceTap,
+    interruptVoiceIfPlaying,
+    recordComboAction,
+    scheduleReturnToIdle,
+    settings.floatingEffectsEnabled,
+    settings.gfName,
+    settings.ayushName,
+    showSpeech
+  ]);
 
-  // Bubble click cycles to next line
+  // Bubble click cycles to next line without spamming
   const handleBubbleClick = useCallback(() => {
     soundManager.playPop();
-    const allQuotes = [
-      ...GREETING_DIALOGUES,
-      ...LOVE_NOTE_DIALOGUES
-    ].filter(q => q !== speechText);
-    const next = allQuotes[Math.floor(Math.random() * allQuotes.length)];
+    const categories = ['compliments', 'loveNotes', 'teasing', 'encouraging'];
+    const randomCat = categories[Math.floor(Math.random() * categories.length)];
+    const next = getNextDialogue(randomCat);
     showSpeech(next, 3800);
-  }, [showSpeech, speechText]);
+  }, [getNextDialogue, showSpeech]);
 
   // Sound toggle with instant sound feedback on unmute
   const handleToggleMute = useCallback(() => {
     const nextMuted = soundManager.toggleMute();
     setIsMuted(nextMuted);
+    const updatedSettings = { ...settings, soundEnabled: !nextMuted };
+    setSettings(updatedSettings);
+    saveRomanticSettings(updatedSettings);
     if (!nextMuted) {
       soundManager.playPop();
     }
+  }, [settings]);
+
+  // Settings Save & Reset Handlers
+  const handleSaveSettings = useCallback((newSettings) => {
+    setSettings(newSettings);
+    saveRomanticSettings(newSettings);
+    soundManager.setMuted(!newSettings.soundEnabled);
   }, []);
+
+  const handleResetSettings = useCallback(() => {
+    resetAllSettingsAndUnlocks();
+    setSettings(DEFAULT_SETTINGS);
+    setUnlocks({
+      secretHeartUnlocked: false,
+      comboUnlocked: false,
+      heartTapCount: 0,
+      totalKisses: 0,
+      totalHugs: 0
+    });
+    soundManager.setMuted(!DEFAULT_SETTINGS.soundEnabled);
+  }, []);
+
+  // Secret Heart 5-tap Unlock Handler
+  const handleUnlockSecretHeart = useCallback(() => {
+    soundManager.playFanfare();
+    const updatedUnlocks = { ...unlocks, secretHeartUnlocked: true };
+    setUnlocks(updatedUnlocks);
+    saveUnlocks(updatedUnlocks);
+    setUnlockReason('secretHeart');
+    setIsSecretLetterOpen(true);
+  }, [unlocks]);
 
   // Clean up all active timers and audio on unmount
   useEffect(() => {
@@ -299,13 +394,21 @@ export default function App() {
     };
   }, []);
 
+  const daysTogether = calculateDaysTogether(settings.anniversaryDate);
+
   return (
     <div className="game-app-wrapper">
       <div className="bg-glow-orb orb-1" />
       <div className="bg-glow-orb orb-2" />
 
       <main className="game-container">
-        <Header />
+        <Header 
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onUnlockSecretHeart={handleUnlockSecretHeart}
+          daysTogether={daysTogether}
+          gfName={settings.gfName}
+          ayushName={settings.ayushName}
+        />
 
         <div className="game-play-area">
           {/* Compact, unobtrusive, touch-transparent speech bubble */}
@@ -323,6 +426,7 @@ export default function App() {
             setIsHovered={setIsHovered}
             heartBurst={heartBurst}
             talkingVolume={talkingVolume}
+            floatingEffectsEnabled={settings.floatingEffectsEnabled}
           />
         </div>
 
@@ -342,6 +446,26 @@ export default function App() {
           onAmplitude={handleAmplitude}
         />
       </main>
+
+      {/* Romantic Settings Modal */}
+      <RomanticSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onSaveSettings={handleSaveSettings}
+        onResetSettings={handleResetSettings}
+      />
+
+      {/* Secret Romantic Letter Modal */}
+      <SecretLetterModal
+        isOpen={isSecretLetterOpen}
+        onClose={() => setIsSecretLetterOpen(false)}
+        gfName={settings.gfName}
+        ayushName={settings.ayushName}
+        anniversaryDate={settings.anniversaryDate}
+        unlockReason={unlockReason}
+        onResetUnlocks={handleResetSettings}
+      />
     </div>
   );
 }

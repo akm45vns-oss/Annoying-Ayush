@@ -143,8 +143,10 @@ export default function AyushCharacter({
 
     // Eyelid targets based on action
     let targetEyelid = isBlinkingRef.current ? 1.0 : 0.05;
-    if (currentAction === 'kiss' || currentAction === 'hug') {
+    if (currentAction === 'kiss' || currentAction === 'hug' || currentAction === 'cuddle') {
       targetEyelid = 0.85; // gently closed / dreamy eyes
+    } else if (currentAction === 'blush') {
+      targetEyelid = 0.65; // shy bashful eyes
     } else if (currentAction === 'surprised') {
       targetEyelid = 0.0; // wide open
     } else if (currentAction === 'laugh') {
@@ -200,6 +202,17 @@ export default function AyushCharacter({
       targetMouthScaleX = 0.6;
       targetMouthScaleY = 0.7;
       targetMouthScaleZ = 1.5; // pucker
+    } else if (currentAction === 'blush') {
+      targetBlushOpacity = 1.0;
+      targetEyebrowY = 0.17;
+      targetEyebrowRot = 0.04;
+      targetMouthScaleX = 0.85;
+      targetMouthScaleY = 0.75;
+    } else if (currentAction === 'cuddle') {
+      targetBlushOpacity = 0.9;
+      targetEyebrowY = 0.19;
+      targetMouthScaleX = 0.95;
+      targetMouthScaleY = 0.9;
     } else if (currentAction === 'boop') {
       targetBlushOpacity = 0.9;
       targetEyebrowY = 0.22;
@@ -300,6 +313,25 @@ export default function AyushCharacter({
       targetLeftArmRotX = -1.1;
       targetRightArmRotZ = -1.4;
       targetRightArmRotX = -1.1;
+    } else if (currentAction === 'blush') {
+      // Shy bashful tilt, bashful hands brought gently up
+      targetHeadRotX = 0.14;
+      targetHeadRotZ = 0.14;
+      targetBodyY = 0.93;
+      targetLeftArmRotZ = 0.65;
+      targetLeftArmRotX = -0.35;
+      targetRightArmRotZ = -0.65;
+      targetRightArmRotX = -0.35;
+    } else if (currentAction === 'cuddle') {
+      // Cozy lean forward, arms wrapped in an affectionate cuddle
+      targetGroupZ = 0.22;
+      targetBodyY = 0.93;
+      targetHeadRotZ = 0.16 + Math.sin(t * 1.5) * 0.04;
+      targetHeadRotX = 0.1;
+      targetLeftArmRotZ = 1.25;
+      targetLeftArmRotX = -0.8;
+      targetRightArmRotZ = -1.25;
+      targetRightArmRotX = -0.8;
     } else if (currentAction === 'surprised') {
       // Recoil back in surprise
       targetHeadRotX = -0.22;
