@@ -267,12 +267,29 @@ export class TalkingTomController {
               try {
                 this.recognition.start();
                 this.setState(LISTENING_STATES.LISTENING);
-              } catch {}
+              } catch (retryErr) {
+                this.isExplicitlyEnabled = false;
+                this.setState(LISTENING_STATES.ERROR, {
+                  error: retryErr.name || 'start_failed',
+                  message: retryErr.message || 'Could not start microphone.'
+                });
+                if (typeof this.onError === 'function') {
+                  this.onError(retryErr.name || 'start_failed');
+                }
+              }
             }
           }, 150);
         } catch {}
       } else {
         console.warn('Recognition start error:', err);
+        this.isExplicitlyEnabled = false;
+        this.setState(LISTENING_STATES.ERROR, {
+          error: err.name || 'start_failed',
+          message: err.message || 'Could not start microphone.'
+        });
+        if (typeof this.onError === 'function') {
+          this.onError(err.name || 'start_failed');
+        }
       }
     }
   }
@@ -329,6 +346,12 @@ export class TalkingTomController {
    * Deduplicate, validate, and emit finalized phrase for Ayush to repeat
    */
   processFinalPhrase(phrase) {
+    this.currentInterimText = '';
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+
     if (!phrase) return;
     const clean = phrase.trim();
 
@@ -346,13 +369,6 @@ export class TalkingTomController {
 
     this.lastProcessedPhrase = clean;
     this.lastProcessedTime = now;
-    this.currentInterimText = '';
-
-    // Clear any silence timer
-    if (this.silenceTimer) {
-      clearTimeout(this.silenceTimer);
-      this.silenceTimer = null;
-    }
 
     // Suspend recognition while processing to guarantee no feedback
     this.setState(LISTENING_STATES.PROCESSING, { phrase: clean });
@@ -393,6 +409,19 @@ export class TalkingTomController {
       });
       if (typeof this.onError === 'function') {
         this.onError('not-allowed');
+      }
+      return;
+    }
+
+    if (errorType === 'audio-capture') {
+      this.isExplicitlyEnabled = false;
+      this.clearAllTimers();
+      this.setState(LISTENING_STATES.ERROR, {
+        error: errorType,
+        message: 'Microphone hardware capture failed or device disconnected.'
+      });
+      if (typeof this.onError === 'function') {
+        this.onError(errorType);
       }
       return;
     }

@@ -295,4 +295,51 @@ describe('Talking Tom Continuous Listening & Audio Loop Prevention', () => {
 
     controller.destroy();
   });
+
+  it('handles audio-capture failure by stopping and transitioning to ERROR without retry loop', () => {
+    const controller = new TalkingTomController();
+    let errorReported = null;
+
+    controller.onError = (err) => {
+      errorReported = err;
+    };
+
+    controller.startListening();
+    assert.equal(controller.state, LISTENING_STATES.LISTENING);
+
+    controller.handleError({ error: 'audio-capture' });
+
+    assert.equal(controller.state, LISTENING_STATES.ERROR);
+    assert.equal(controller.isExplicitlyEnabled, false);
+    assert.equal(errorReported, 'audio-capture');
+
+    // Confirm that handleEnd does not restart when hardware capture failed
+    controller.handleEnd();
+    assert.equal(controller.state, LISTENING_STATES.ERROR);
+
+    controller.destroy();
+  });
+
+  it('transitions to ERROR and halts if recognition.start() throws an unrecoverable exception', () => {
+    mockRecognition.start = () => {
+      const err = new Error('Microphone busy');
+      err.name = 'NotReadableError';
+      throw err;
+    };
+
+    const controller = new TalkingTomController();
+    let errorReported = null;
+    controller.onError = (err) => {
+      errorReported = err;
+    };
+
+    controller.startListening();
+
+    assert.equal(controller.state, LISTENING_STATES.ERROR);
+    assert.equal(controller.isExplicitlyEnabled, false);
+    assert.equal(errorReported, 'NotReadableError');
+
+    controller.destroy();
+  });
 });
+
