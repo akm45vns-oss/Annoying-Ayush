@@ -38,6 +38,7 @@ export default function ChatPanel({
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [apiStatus, setApiStatus] = useState('checking'); // 'live' | 'offline' | 'checking'
+  const [activeProvider, setActiveProvider] = useState('');
   const [lastFailedMessage, setLastFailedMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -135,8 +136,11 @@ export default function ChatPanel({
       const data = await res.json().catch(() => null);
 
       if (res.ok && data && data.ok) {
-        // Successful Live AI Response
-        setApiStatus('live');
+        // Successful response (either from Live AI or server fallback)
+        const isOffline = !!data.isOfflineFallback;
+        setApiStatus(isOffline ? 'offline' : 'live');
+        if (data.provider) setActiveProvider(data.provider);
+
         const replyText = data.reply;
         const reaction = data.reaction || detectCharacterReaction(replyText);
 
@@ -145,8 +149,8 @@ export default function ChatPanel({
           sender: 'ayush',
           text: replyText,
           timestamp: Date.now(),
-          isOfflineFallback: false,
-          provider: data.provider || 'ai'
+          isOfflineFallback: isOffline,
+          provider: data.provider || (isOffline ? 'offline' : 'ai')
         };
 
         setMessages((prev) => [...prev, aiMsg]);
@@ -155,6 +159,7 @@ export default function ChatPanel({
       } else if (data && data.configured === false) {
         // AI API key not configured on server: Seamless Smart Offline Fallback
         setApiStatus('offline');
+        setActiveProvider('offline');
         const fallback = generateOfflineFallback(text, gfName, ayushName);
 
         const fallbackMsg = {
@@ -169,8 +174,20 @@ export default function ChatPanel({
         soundManager.playChime();
         onAyushReply(fallback.reply, fallback.reaction);
       } else {
-        // Recoverable error (e.g. timeout, rate limit, provider network issue)
-        throw new Error(data?.error || 'Unable to get response from AI.');
+        // Fallback gracefully without leaving user in error
+        const fallback = generateOfflineFallback(text, gfName, ayushName);
+        const fallbackMsg = {
+          id: 'reply-' + Date.now(),
+          sender: 'ayush',
+          text: fallback.reply,
+          timestamp: Date.now(),
+          isOfflineFallback: true
+        };
+        setMessages((prev) => [...prev, fallbackMsg]);
+        setApiStatus('offline');
+        setActiveProvider('offline');
+        soundManager.playChime();
+        onAyushReply(fallback.reply, fallback.reaction);
       }
     } catch (err) {
       console.warn('Chat request error, using fallback or allowing retry:', err.message);
@@ -237,9 +254,11 @@ export default function ChatPanel({
             <h3 className="chat-title">Chat with {ayushName}</h3>
             <div className="chat-status-indicator">
               {apiStatus === 'live' ? (
-                <span className="status-badge live-badge">⚡ Live AI</span>
+                <span className="status-badge live-badge">
+                  ⚡ Live AI {activeProvider ? `(${activeProvider.toUpperCase()})` : ''}
+                </span>
               ) : (
-                <span className="status-badge offline-badge" title="Pre-programmed responses active. Add GEMINI_API_KEY or OPENAI_API_KEY on server for live AI.">
+                <span className="status-badge offline-badge" title="Pre-programmed failover mode active.">
                   📱 Pre-programmed Mode
                 </span>
               )}

@@ -1,17 +1,17 @@
 /**
- * Server-Side AI Chat Handler for Annoying Ayush
- * Compatible with Vercel Serverless Functions and local Vite dev server.
+ * Server-Side Multi-Provider AI Chat Handler for Annoying Ayush
  * 
- * Supports:
- * 1. Google Gemini API (GEMINI_API_KEY) - default model: gemini-1.5-flash
- * 2. OpenAI API (OPENAI_API_KEY) - default model: gpt-4o-mini
- * 3. Graceful unconfigured/offline fallback detection
+ * Multi-Tier Failover Architecture:
+ * - Tier 1: Groq Cloud (Ultra-fast, Llama/Qwen, 100% Free)
+ * - Tier 2 Failover: Google Gemini (Gemini Flash, 100% Free)
+ * - Tier 3 Failover: OpenAI (if configured)
+ * - Tier 4 Fail-Safe: Intelligent Contextual Offline Fallback (never leaves user with an error)
  */
 
-// Simple in-memory rate limiter per IP (max 20 requests/minute)
+// Simple in-memory rate limiter per IP (max 25 requests/minute)
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 20;
+const MAX_REQUESTS_PER_WINDOW = 25;
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -50,7 +50,6 @@ async function parseBody(req) {
     let raw = '';
     req.on('data', (chunk) => {
       raw += chunk;
-      // Guard against excessively large payloads (> 64KB)
       if (raw.length > 65536) {
         req.destroy();
         resolve(null);
@@ -84,31 +83,104 @@ Personality Guidelines:
 }
 
 // Infer character reaction animation from message content
-function inferCharacterReaction(text) {
+function inferCharacterReaction(text = '') {
   const lower = text.toLowerCase();
   if (lower.includes('kiss') || lower.includes('mwah') || lower.includes('😘') || lower.includes('💋')) {
     return 'kiss';
   }
-  if (lower.includes('hug') || lower.includes('cuddle') || lower.includes('hold you') || lower.includes('snuggle') || lower.includes('🧸')) {
+  if (lower.includes('hug') || lower.includes('cuddle') || lower.includes('hold you') || lower.includes('snuggle') || lower.includes('blanket') || lower.includes('🧸')) {
     return 'hug';
   }
-  if (lower.includes('blush') || lower.includes('cute') || lower.includes('flustered') || lower.includes('gorgeous') || lower.includes('pretty') || lower.includes('😳')) {
+  if (lower.includes('blush') || lower.includes('cute') || lower.includes('pretty') || lower.includes('gorgeous') || lower.includes('dork') || lower.includes('flustered') || lower.includes('😳')) {
     return 'blush';
   }
-  if (lower.includes('haha') || lower.includes('laugh') || lower.includes('annoying') || lower.includes('tease') || lower.includes('😂') || lower.includes('😜')) {
+  if (lower.includes('haha') || lower.includes('annoying') || lower.includes('tease') || lower.includes('joke') || lower.includes('😂') || lower.includes('😜') || lower.includes('mission accomplished')) {
     return 'laugh';
   }
   return 'happy';
 }
 
+// Built-in intelligent offline fallback generator (guarantees zero-failure resilience)
+function generateServerFallback(userText = '', gfName = 'Babe', ayushName = 'Ayush') {
+  const lower = userText.toLowerCase().trim();
+
+  const pools = {
+    missYou: [
+      `Aww, come here 🥺 Sending you the biggest virtual hug until I can annoy you properly in real life!`,
+      `I miss you more, ${gfName}! Every single second without you is completely boring. ❤️`,
+      `Look at your screen... that's me sending 1,000 warm cuddles right to your heart! 🧸💕`,
+    ],
+    annoying: [
+      `Mission accomplished 😌 But admit it, your day would be so boring without me!`,
+      `Hey! That's '${ayushName}, your favorite human nuisance' to you! 😜`,
+      `Complain all you want, ${gfName}, you're officially stuck with me forever! 🥰`,
+      `I'm not annoying, I'm just passionately dedicated to keeping you entertained! 😂✨`,
+    ],
+    loveYou: [
+      `I love you 10,000x more than code, pixels, or words could ever express! 💖`,
+      `One sweet message from you and I'm grinning at my screen like a dork. 😳❤️`,
+      `Catch! That's infinite love beamed directly into your hands! 💌✨`,
+      `You're my today, my tomorrow, and my absolute favorite person in the universe. 🥰`,
+    ],
+    whatDoing: [
+      `Waiting for my favourite person to give me some attention. I've been standing here looking cute all day 😂`,
+      `Thinking about you... and planning my next 50 jokes to make you smile! 😜`,
+      `Practicing my best cartoon poses so I look handsome when you open this app! 🕺✨`,
+    ],
+    sadOrStressed: [
+      `Hey, come here for a virtual hug. ❤️ You don't have to pretend to be okay with me. Want to tell me what's bothering you?`,
+      `Take a deep breath, my love. Whatever happened today, you're capable of anything and I'm right beside you. 🌸`,
+      `Sending you infinite blankets, hot tea, and cozy vibes. I'm always on your team, ${gfName}! 🧸💖`,
+    ],
+    greetings: [
+      `Hey ${gfName}! My virtual heart skipped a beat when you opened our chat! 🥰`,
+      `Look who decided to grace my screen with their beauty! What's on your mind? ✨`,
+      `Finally! I was getting lonely standing here in 3D! 😜💕`,
+    ],
+    kissesAndHugs: [
+      `MWAHHH! 💋 100 kisses delivered straight to your cheeks!`,
+      `Virtual hug locked in! Squeeeeze! Don't let go! 🧸❤️`,
+      `Cuddling right next to you now. Warm and safe. 🥰🌸`,
+    ],
+    general: [
+      `You always know how to make me smile through a screen, ${gfName}. 🥰`,
+      `Tell me everything! I'm all ears (and a cute cartoon hoodie). 👂✨`,
+      `Whatever you do today, remember that you're adored by your favorite boy! 💖`,
+      `Haha you're too cute! Keep chatting with me, I love hearing from you. 🌸`,
+    ],
+  };
+
+  let pool = pools.general;
+  if (lower.includes('miss') || lower.includes('where are you') || lower.includes('wish you were here')) {
+    pool = pools.missYou;
+  } else if (lower.includes('annoy') || lower.includes('stop') || lower.includes('dork') || lower.includes('idiot') || lower.includes('shut up')) {
+    pool = pools.annoying;
+  } else if (lower.includes('love') || lower.includes('adore') || lower.includes('cute') || lower.includes('sweet')) {
+    pool = pools.loveYou;
+  } else if (lower.includes('what are you doing') || lower.includes('wyd') || lower.includes('what r u doing') || lower.includes('doing')) {
+    pool = pools.whatDoing;
+  } else if (lower.includes('sad') || lower.includes('stress') || lower.includes('tired') || lower.includes('cry') || lower.includes('bad day') || lower.includes('hurt') || lower.includes('exhausted')) {
+    pool = pools.sadOrStressed;
+  } else if (lower.includes('hi') || lower.includes('hello') || lower.includes('hey') || lower.includes('good morning') || lower.includes('good night') || lower.includes('yo')) {
+    pool = pools.greetings;
+  } else if (lower.includes('kiss') || lower.includes('hug') || lower.includes('cuddle') || lower.includes('snuggle')) {
+    pool = pools.kissesAndHugs;
+  }
+
+  const reply = pool[Math.floor(Math.random() * pool.length)];
+  return {
+    reply,
+    reaction: inferCharacterReaction(reply),
+    isOfflineFallback: true
+  };
+}
+
 // Call Google Gemini API
-async function callGemini(apiKey, systemPrompt, history, userMessage) {
-  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+async function callGemini(apiKey, systemPrompt, history, userMessage, model = 'gemini-flash-latest') {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const contents = [];
 
-  // Map bounded history to Gemini contents format
   if (Array.isArray(history)) {
     for (const h of history) {
       if (h.role && h.content) {
@@ -120,7 +192,6 @@ async function callGemini(apiKey, systemPrompt, history, userMessage) {
     }
   }
 
-  // Append user's current message
   contents.push({
     role: 'user',
     parts: [{ text: userMessage }]
@@ -142,12 +213,12 @@ async function callGemini(apiKey, systemPrompt, history, userMessage) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(12000)
+    signal: AbortSignal.timeout(10000)
   });
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
-    throw new Error(`Gemini API error status ${response.status}: ${errText.slice(0, 100)}`);
+    throw new Error(`Gemini error ${response.status}: ${errText.slice(0, 80)}`);
   }
 
   const data = await response.json();
@@ -159,8 +230,8 @@ async function callGemini(apiKey, systemPrompt, history, userMessage) {
   return reply.trim();
 }
 
-// Call OpenAI-compatible APIs (OpenAI, Groq, OpenRouter)
-async function callOpenAICompatible(apiKey, baseURL, model, systemPrompt, history, userMessage, providerName = 'ai') {
+// Call OpenAI-compatible APIs (Groq, OpenAI, OpenRouter)
+async function callOpenAICompatible(apiKey, baseURL, model, systemPrompt, history, userMessage, providerLabel = 'ai') {
   const url = `${baseURL.replace(/\/+$/, '')}/chat/completions`;
 
   const messages = [
@@ -195,39 +266,36 @@ async function callOpenAICompatible(apiKey, baseURL, model, systemPrompt, histor
       temperature: 0.85,
       max_tokens: 180
     }),
-    signal: AbortSignal.timeout(12000)
+    signal: AbortSignal.timeout(10000)
   });
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
-    throw new Error(`${providerName} API error status ${response.status}: ${errText.slice(0, 100)}`);
+    throw new Error(`${providerLabel} error ${response.status}: ${errText.slice(0, 80)}`);
   }
 
   const data = await response.json();
   const reply = data?.choices?.[0]?.message?.content;
   if (!reply) {
-    throw new Error(`${providerName} returned an empty reply.`);
+    throw new Error(`${providerLabel} returned an empty reply.`);
   }
 
   return reply.trim();
 }
 
 /**
- * Main request dispatcher
+ * Main request dispatcher with Automatic Multi-Tier Failover Protection
  */
 export async function handleChatRequest(req, res) {
-  // CORS & Security Headers
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
-  // Only allow POST
   if (req.method !== 'POST') {
     res.statusCode = 405;
     res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
     return;
   }
 
-  // Rate Limiting
   const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'client';
   if (!checkRateLimit(String(clientIp))) {
     res.statusCode = 429;
@@ -239,7 +307,6 @@ export async function handleChatRequest(req, res) {
     return;
   }
 
-  // Parse & Validate Payload
   const body = await parseBody(req);
   if (!body) {
     res.statusCode = 400;
@@ -254,68 +321,101 @@ export async function handleChatRequest(req, res) {
     return;
   }
 
-  const userMessage = rawMessage.trim().slice(0, 500); // Enforce max 500 chars
+  const userMessage = rawMessage.trim().slice(0, 500);
   const gfName = String(body.gfName || 'Babe').trim().slice(0, 30);
   const ayushName = String(body.ayushName || 'Ayush').trim().slice(0, 30);
-  const history = Array.isArray(body.history) ? body.history.slice(-8) : []; // Limit to last 8 turns
+  const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
 
-  // Check Provider Configuration
   const groqKey = process.env.GROQ_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
+  // If no keys configured at all, gracefully use intelligent offline fallback
   if (!groqKey && !geminiKey && !openaiKey) {
-    // Graceful unconfigured response: let the frontend know to seamlessly use smart offline fallback
+    const fallback = generateServerFallback(userMessage, gfName, ayushName);
     res.statusCode = 200;
     res.end(JSON.stringify({
-      ok: false,
+      ok: true,
       configured: false,
-      error: 'AI API key not configured on server.',
-      message: 'No server-side AI key found (GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY).'
+      reply: fallback.reply,
+      reaction: fallback.reaction,
+      provider: 'offline-fallback',
+      isOfflineFallback: true
     }));
     return;
   }
 
   const systemPrompt = buildSystemPrompt(gfName, ayushName);
+  let replyText = '';
+  let providerName = '';
 
-  try {
-    let replyText = '';
-    let providerName = '';
-
-    if (groqKey) {
-      providerName = 'groq';
-      const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  // =========================================================================
+  // TIER 1: Try Groq Cloud (Ultra-fast)
+  // =========================================================================
+  if (groqKey) {
+    try {
+      const model = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
       replyText = await callOpenAICompatible(groqKey, 'https://api.groq.com/openai/v1', model, systemPrompt, history, userMessage, 'Groq');
-    } else if (geminiKey) {
+      providerName = 'groq';
+    } catch (err) {
+      console.warn('Groq failed, attempting failover to Gemini:', err.message);
+    }
+  }
+
+  // =========================================================================
+  // TIER 2 FAILOVER: Try Google Gemini (Gemini Flash)
+  // =========================================================================
+  if (!replyText && geminiKey) {
+    try {
+      const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+      replyText = await callGemini(geminiKey, systemPrompt, history, userMessage, model);
       providerName = 'gemini';
-      replyText = await callGemini(geminiKey, systemPrompt, history, userMessage);
-    } else {
-      providerName = 'openai';
+    } catch (err) {
+      console.warn('Gemini failed, attempting failover to OpenAI:', err.message);
+    }
+  }
+
+  // =========================================================================
+  // TIER 3 FAILOVER: Try OpenAI (if configured)
+  // =========================================================================
+  if (!replyText && openaiKey) {
+    try {
       const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
       const baseURL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
       replyText = await callOpenAICompatible(openaiKey, baseURL, model, systemPrompt, history, userMessage, 'OpenAI');
+      providerName = 'openai';
+    } catch (err) {
+      console.warn('OpenAI failed:', err.message);
     }
+  }
 
-    const reaction = inferCharacterReaction(replyText);
-
+  // =========================================================================
+  // TIER 4 FAIL-SAFE: Smart Offline Fallback (Guarantees 100% Resilience)
+  // =========================================================================
+  if (!replyText) {
+    console.warn('All AI providers exhausted. Using intelligent offline fallback response.');
+    const fallback = generateServerFallback(userMessage, gfName, ayushName);
     res.statusCode = 200;
     res.end(JSON.stringify({
       ok: true,
       configured: true,
-      reply: replyText,
-      reaction,
-      provider: providerName
+      reply: fallback.reply,
+      reaction: fallback.reaction,
+      provider: 'offline-fallback',
+      isOfflineFallback: true
     }));
-  } catch (err) {
-    console.error('AI chat endpoint error:', err.message);
-
-    // Provide friendly error without leaking internal credentials or stack trace
-    res.statusCode = 502;
-    res.end(JSON.stringify({
-      ok: false,
-      configured: true,
-      error: 'Failed to communicate with AI provider. Please try again.',
-      canRetry: true
-    }));
+    return;
   }
+
+  const reaction = inferCharacterReaction(replyText);
+
+  res.statusCode = 200;
+  res.end(JSON.stringify({
+    ok: true,
+    configured: true,
+    reply: replyText,
+    reaction,
+    provider: providerName,
+    isOfflineFallback: false
+  }));
 }
