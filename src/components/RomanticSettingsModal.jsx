@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Settings, 
@@ -24,6 +24,7 @@ export default function RomanticSettingsModal({
   const [formData, setFormData] = useState(settings);
   const [prevSettings, setPrevSettings] = useState(settings);
   const [showSavedNotification, setShowSavedNotification] = useState(false);
+  const activeBlobUrlRef = useRef(null);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -237,7 +238,11 @@ export default function RomanticSettingsModal({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
+                        if (activeBlobUrlRef.current && activeBlobUrlRef.current.startsWith('blob:')) {
+                          try { URL.revokeObjectURL(activeBlobUrlRef.current); } catch {}
+                        }
                         const url = URL.createObjectURL(file);
+                        activeBlobUrlRef.current = url;
                         handleChange('customModelUrl', url);
                       }
                     }}
@@ -247,7 +252,13 @@ export default function RomanticSettingsModal({
                   <button
                     type="button"
                     className="model-reset-btn"
-                    onClick={() => handleChange('customModelUrl', '')}
+                    onClick={() => {
+                      if (activeBlobUrlRef.current && activeBlobUrlRef.current.startsWith('blob:')) {
+                        try { URL.revokeObjectURL(activeBlobUrlRef.current); } catch {}
+                        activeBlobUrlRef.current = null;
+                      }
+                      handleChange('customModelUrl', '');
+                    }}
                   >
                     Reset to Default
                   </button>

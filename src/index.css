@@ -709,7 +709,7 @@ html, body {
   border-radius: var(--radius-sm);
   padding: 8px 10px;
   font-family: var(--font-body);
-  font-size: var(--text-sm);
+  font-size: var(--text-base); /* 16px ensures mobile browsers do not trigger unwanted auto-zoom */
   line-height: 1.4;
   color: var(--color-text);
   background: var(--color-surface-soft);
@@ -1293,7 +1293,7 @@ html, body {
   border-radius: var(--radius-pill);
   padding: 10px 16px;
   min-height: var(--touch-target);
-  font-size: var(--text-sm);
+  font-size: var(--text-base); /* 16px prevents mobile auto-zoom */
   background: var(--color-surface);
   color: var(--color-text);
   font-family: inherit;
@@ -1573,7 +1573,7 @@ html, body {
   border-radius: var(--radius-sm);
   padding: 8px 12px;
   min-height: var(--touch-target);
-  font-size: var(--text-sm);
+  font-size: var(--text-base); /* 16px prevents mobile auto-zoom */
   background: var(--color-surface);
   color: var(--color-text);
   font-family: inherit;

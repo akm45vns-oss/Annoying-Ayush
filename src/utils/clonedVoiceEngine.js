@@ -4,6 +4,8 @@
  * Handles:
  * - Requesting speech generation from server-side TTS (/api/tts)
  * - Decoding received binary MP3 audio into Web Audio AudioBuffers
+ * - Coordinated timeout (17s) and in-flight request cancellation
+ * - Safe late-response rejection: late audio never plays after user pressed Stop/Reset
  * - Dual playback modes:
  *   1. "ayush": Pristine playback using the authorized cloned voice model.
  *   2. "funny": Real-time pitch-shifted cartoon chipmunk effect applied to the cloned voice!
@@ -18,8 +20,11 @@ class ClonedVoiceEngine {
     this.analyser = null;
     this.animFrameId = null;
     this.isPlaying = false;
+    this.isGenerating = false;
     this.cachedAudioBuffer = null;
     this.lastGeneratedText = '';
+    this.activeRequestId = 0;
+    this.currentAbortController = null;
   }
 
   getAudioContext() {
@@ -36,16 +41,48 @@ class ClonedVoiceEngine {
   }
 
   /**
+   * Cancels any in-flight TTS generation request
+   */
+  cancelGeneration() {
+    this.activeRequestId++;
+    if (this.currentAbortController) {
+      try {
+        this.currentAbortController.abort();
+      } catch {}
+      this.currentAbortController = null;
+    }
+    this.isGenerating = false;
+  }
+
+  /**
    * Request TTS generation from server (/api/tts)
+   * Client request timeout is 17 seconds (slightly longer than server's 14s overall deadline)
+   * 
    * @param {string} text - text to speak
-   * @returns {Promise<{ ok: boolean, isCloned: boolean, error?: string }>}
+   * @returns {Promise<{ ok: boolean, isCloned: boolean, cancelled?: boolean, error?: string, duration?: number, fallbackReason?: string, message?: string }>}
    */
   async generateSpeech(text) {
     if (!text || !text.trim()) {
       throw new Error('Text prompt cannot be empty.');
     }
 
+    // Stop existing playback and cancel any in-flight generation
     this.stopPlayback();
+    this.cancelGeneration();
+
+    const currentReqId = ++this.activeRequestId;
+    this.isGenerating = true;
+
+    const controller = new AbortController();
+    this.currentAbortController = controller;
+
+    // Client deadline: 17s (allows server's 14s deadline + network delivery margin)
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort(new Error('TTS request timed out on client (17s).'));
+      } catch {}
+    }, 17000);
+
     const cleanText = text.trim();
 
     try {
@@ -53,18 +90,32 @@ class ClonedVoiceEngine {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: cleanText }),
-        signal: AbortSignal.timeout(15000) // Bound TTS generation to 15 seconds max
+        signal: controller.signal
       });
+
+      // Verify request is still active
+      if (currentReqId !== this.activeRequestId) {
+        return { ok: false, isCloned: false, cancelled: true };
+      }
 
       const contentType = res.headers.get('content-type') || '';
 
       if (res.ok && contentType.includes('audio/')) {
-        // Cloned Voice Audio Buffer received
         const arrayBuffer = await res.arrayBuffer();
+
+        if (currentReqId !== this.activeRequestId) {
+          return { ok: false, isCloned: false, cancelled: true };
+        }
+
         const ctx = this.getAudioContext();
         if (!ctx) throw new Error('Web Audio not supported in this browser.');
 
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        if (currentReqId !== this.activeRequestId) {
+          return { ok: false, isCloned: false, cancelled: true };
+        }
+
         this.cachedAudioBuffer = audioBuffer;
         this.lastGeneratedText = cleanText;
 
@@ -75,12 +126,16 @@ class ClonedVoiceEngine {
         };
       }
 
-      // JSON response (e.g. unconfigured or fallback)
+      // JSON response (e.g. unconfigured, fallback, or error)
       const data = await res.json().catch(() => null);
+
+      if (currentReqId !== this.activeRequestId) {
+        return { ok: false, isCloned: false, cancelled: true };
+      }
+
       this.lastGeneratedText = cleanText;
 
       if (data && data.configured === false) {
-        // Voice clone credentials not set on server: indicate fallback available
         return {
           ok: true,
           isCloned: false,
@@ -95,12 +150,28 @@ class ClonedVoiceEngine {
         error: data?.error || 'Could not generate speech.'
       };
     } catch (err) {
+      if (currentReqId !== this.activeRequestId || err.name === 'AbortError') {
+        return {
+          ok: false,
+          isCloned: false,
+          cancelled: true,
+          error: 'TTS generation was cancelled or timed out.'
+        };
+      }
       console.warn('TTS request error:', err.message);
       return {
         ok: false,
         isCloned: false,
         error: err.message
       };
+    } finally {
+      clearTimeout(timeoutId);
+      if (this.currentAbortController === controller) {
+        this.currentAbortController = null;
+      }
+      if (currentReqId === this.activeRequestId) {
+        this.isGenerating = false;
+      }
     }
   }
 
@@ -254,6 +325,8 @@ class ClonedVoiceEngine {
   }
 
   stopPlayback() {
+    this.cancelGeneration();
+
     if (this.currentSource) {
       try {
         this.currentSource.stop();

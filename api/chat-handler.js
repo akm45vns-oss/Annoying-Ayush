@@ -8,40 +8,15 @@
  * - Tier 4 Fail-Safe: Intelligent Contextual Offline Fallback (never leaves user with an error)
  */
 
-// Simple in-memory rate limiter per IP (max 25 requests/minute)
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 25;
+import { createRateLimiter, getClientIp } from './rateLimiter.js';
 
-function checkRateLimit(ip) {
-  const now = Date.now();
-
-  // Prune entries that have expired to prevent unbounded map growth.
-  if (rateLimitMap.size > 500) {
-    for (const [key, record] of rateLimitMap.entries()) {
-      if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
-        rateLimitMap.delete(key);
-      }
-    }
-  }
-
-  const record = rateLimitMap.get(ip) || { count: 0, startTime: now };
-
-  if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
-    record.count = 1;
-    record.startTime = now;
-    rateLimitMap.set(ip, record);
-    return true;
-  }
-
-  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-    return false;
-  }
-
-  record.count += 1;
-  rateLimitMap.set(ip, record);
-  return true;
-}
+// Process-local bounded rate limiter for chat (25 requests/minute per client IP)
+export const chatRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 25,
+  maxEntries: 1000,
+  name: 'chat'
+});
 
 // Helper to safely parse JSON body from incoming stream or pre-parsed object
 async function parseBody(req) {
@@ -306,13 +281,14 @@ export async function handleChatRequest(req, res) {
     return;
   }
 
-  const clientIp = req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || 'client';
-  if (!checkRateLimit(String(clientIp))) {
-    res.statusCode = 429;
+  const clientIp = getClientIp(req);
+  const rateLimitResult = chatRateLimiter.check(clientIp);
+  if (!rateLimitResult.allowed) {
+    res.statusCode = rateLimitResult.status;
     res.end(JSON.stringify({ 
       ok: false, 
-      error: 'Too many messages sent. Please pause for a moment.',
-      rateLimited: true
+      error: rateLimitResult.error,
+      rateLimited: rateLimitResult.status === 429
     }));
     return;
   }

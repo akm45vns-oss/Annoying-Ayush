@@ -125,6 +125,7 @@ export default function AyushModelManager({
   // Render Custom Model with ErrorBoundary and Suspense Loader
   return (
     <ModelErrorBoundary 
+      key={activeUrl}
       fallback={proceduralFallback}
       onError={() => setDefaultModelFound(false)}
     >

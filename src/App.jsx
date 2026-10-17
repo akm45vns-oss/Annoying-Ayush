@@ -145,7 +145,7 @@ export default function App() {
       voiceEngine.stopPlayback();
       didStop = true;
     }
-    if (clonedVoiceEngine.isPlaying) {
+    if (clonedVoiceEngine.isPlaying || clonedVoiceEngine.isGenerating) {
       clonedVoiceEngine.stopPlayback();
       didStop = true;
     }
@@ -162,6 +162,10 @@ export default function App() {
     if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
 
     voiceEngine.cleanup();
+    clonedVoiceEngine.cleanup();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
     setTalkingVolume(0);
     tapCounterRef.current = 0;
     setAnnoyanceCount(0);

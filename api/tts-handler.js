@@ -4,46 +4,31 @@
  * Supports:
  * - Primary: ElevenLabs Voice Cloning (Instant Voice Clone with custom authorized VOICE_ID)
  * - Secondary Failover: OpenAI TTS (tts-1)
- * - Graceful unconfigured response informing client to use browser speech synthesis
+ * - Graceful unconfigured / timeout response informing client to use browser speech synthesis
  * 
- * Security:
+ * Security & Reliability:
  * - API keys are strictly read from process.env on the server.
- * - In-memory rate limiter per IP to prevent quota abuse.
+ * - In-memory bounded rate limiter per IP to prevent quota abuse.
+ * - Coordinated overall server-side deadline (14s) ensuring provider attempts
+ *   and failovers fit within serverless execution limits without hanging.
  */
 
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 20;
+import { createRateLimiter, getClientIp } from './rateLimiter.js';
 
-function checkRateLimit(ip) {
-  const now = Date.now();
+// Process-local bounded rate limiter for voice generation (20 requests/minute per client IP)
+export const ttsRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 20,
+  maxEntries: 1000,
+  name: 'tts'
+});
 
-  // Prune entries that have expired to prevent unbounded map growth.
-  if (rateLimitMap.size > 500) {
-    for (const [key, record] of rateLimitMap.entries()) {
-      if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
-        rateLimitMap.delete(key);
-      }
-    }
-  }
-
-  const record = rateLimitMap.get(ip) || { count: 0, startTime: now };
-
-  if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
-    record.count = 1;
-    record.startTime = now;
-    rateLimitMap.set(ip, record);
-    return true;
-  }
-
-  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-    return false;
-  }
-
-  record.count += 1;
-  rateLimitMap.set(ip, record);
-  return true;
-}
+// Coordinated Server Deadlines (Vercel max execution is bounded to 15s)
+export const SERVER_TOTAL_DEADLINE_MS = 14000;
+const ELEVENLABS_MAX_TIMEOUT_MS = 8000;
+const OPENAI_MIN_RESERVE_MS = 3500;
+const OPENAI_MAX_TIMEOUT_MS = 5000;
+const MIN_TIME_TO_ATTEMPT_MS = 2500;
 
 async function parseBody(req) {
   if (req.body && typeof req.body === 'object') {
@@ -78,6 +63,8 @@ async function parseBody(req) {
 }
 
 export async function handleTtsRequest(req, res) {
+  const requestStartTime = Date.now();
+
   if (req.method !== 'POST') {
     res.setHeader('Content-Type', 'application/json');
     res.statusCode = 405;
@@ -85,14 +72,15 @@ export async function handleTtsRequest(req, res) {
     return;
   }
 
-  const clientIp = req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || 'client';
-  if (!checkRateLimit(String(clientIp))) {
+  const clientIp = getClientIp(req);
+  const rateLimitResult = ttsRateLimiter.check(clientIp);
+  if (!rateLimitResult.allowed) {
     res.setHeader('Content-Type', 'application/json');
-    res.statusCode = 429;
+    res.statusCode = rateLimitResult.status;
     res.end(JSON.stringify({ 
       ok: false, 
-      error: 'Too many voice generation requests. Please pause for a moment.',
-      rateLimited: true 
+      error: rateLimitResult.error,
+      rateLimited: rateLimitResult.status === 429 
     }));
     return;
   }
@@ -128,44 +116,52 @@ export async function handleTtsRequest(req, res) {
   // TIER 1: ElevenLabs Authorized Voice Clone
   // -------------------------------------------------------------------------
   if (elevenKey && elevenVoiceId) {
-    try {
-      const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
-      const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoiceId)}`;
+    const elapsed = Date.now() - requestStartTime;
+    const remainingBudget = SERVER_TOTAL_DEADLINE_MS - elapsed;
+    const reserveForFallback = openaiKey ? OPENAI_MIN_RESERVE_MS : 0;
+    const availableForEleven = remainingBudget - reserveForFallback;
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'xi-api-key': elevenKey,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg'
-        },
-        body: JSON.stringify({
-          text,
-          model_id: modelId,
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.8,
-            style: 0.25,
-            use_speaker_boost: true
-          }
-        }),
-        signal: AbortSignal.timeout(15000) // ElevenLabs generation deadline
-      });
+    if (availableForEleven >= MIN_TIME_TO_ATTEMPT_MS) {
+      const elevenTimeout = Math.min(ELEVENLABS_MAX_TIMEOUT_MS, availableForEleven);
+      try {
+        const modelId = process.env.ELEVENLABS_MODEL_ID || 'eleven_multilingual_v2';
+        const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoiceId)}`;
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`ElevenLabs error ${response.status}:`, errorText);
-        throw new Error(`ElevenLabs error: ${response.status}`);
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': elevenKey,
+            'Content-Type': 'application/json',
+            'Accept': 'audio/mpeg'
+          },
+          body: JSON.stringify({
+            text,
+            model_id: modelId,
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.8,
+              style: 0.25,
+              use_speaker_boost: true
+            }
+          }),
+          signal: AbortSignal.timeout(elevenTimeout)
+        });
+
+        if (!response.ok) {
+          throw new Error(`ElevenLabs error: ${response.status}`);
+        }
+
+        const audioBuffer = await response.arrayBuffer();
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.statusCode = 200;
+        res.end(Buffer.from(audioBuffer));
+        return;
+      } catch (err) {
+        console.warn('ElevenLabs generation failed or timed out, attempting failover:', err.message);
       }
-
-      const audioBuffer = await response.arrayBuffer();
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-      res.statusCode = 200;
-      res.end(Buffer.from(audioBuffer));
-      return;
-    } catch (err) {
-      console.warn('ElevenLabs generation failed, attempting failover:', err.message);
+    } else {
+      console.warn('Insufficient remaining deadline for ElevenLabs, skipping to failover provider.');
     }
   }
 
@@ -173,40 +169,48 @@ export async function handleTtsRequest(req, res) {
   // TIER 2 FAILOVER: OpenAI TTS (if configured)
   // -------------------------------------------------------------------------
   if (openaiKey) {
-    try {
-      const model = process.env.OPENAI_TTS_MODEL || 'tts-1';
-      const voice = process.env.OPENAI_TTS_VOICE || 'echo'; // male/friendly tone
+    const elapsed = Date.now() - requestStartTime;
+    const remainingForOpenai = SERVER_TOTAL_DEADLINE_MS - elapsed;
 
-      const response = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model,
-          input: text,
-          voice
-        }),
-        signal: AbortSignal.timeout(12000) // OpenAI TTS deadline
-      });
+    if (remainingForOpenai >= MIN_TIME_TO_ATTEMPT_MS) {
+      const openaiTimeout = Math.min(OPENAI_MAX_TIMEOUT_MS, remainingForOpenai - 400);
+      try {
+        const model = process.env.OPENAI_TTS_MODEL || 'tts-1';
+        const voice = process.env.OPENAI_TTS_VOICE || 'echo'; // male/friendly tone
 
-      if (!response.ok) {
-        throw new Error(`OpenAI TTS error: ${response.status}`);
+        const response = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model,
+            input: text,
+            voice
+          }),
+          signal: AbortSignal.timeout(openaiTimeout)
+        });
+
+        if (!response.ok) {
+          throw new Error(`OpenAI TTS error: ${response.status}`);
+        }
+
+        const audioBuffer = await response.arrayBuffer();
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.statusCode = 200;
+        res.end(Buffer.from(audioBuffer));
+        return;
+      } catch (err) {
+        console.warn('OpenAI TTS failed or timed out:', err.message);
       }
-
-      const audioBuffer = await response.arrayBuffer();
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-      res.statusCode = 200;
-      res.end(Buffer.from(audioBuffer));
-      return;
-    } catch (err) {
-      console.warn('OpenAI TTS failed:', err.message);
+    } else {
+      console.warn('Insufficient remaining deadline for OpenAI TTS failover.');
     }
   }
 
-  // If external generation failed, return fallback payload
+  // If external generation failed or overall budget expired, return fallback payload
   res.setHeader('Content-Type', 'application/json');
   res.statusCode = 200;
   res.end(JSON.stringify({

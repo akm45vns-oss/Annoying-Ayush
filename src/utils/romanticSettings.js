@@ -24,27 +24,110 @@ export const DEFAULT_UNLOCKS = {
   totalHugs: 0,
 };
 
+/**
+ * Validates and normalizes a 3D model URL for persistent storage or loading.
+ * Ephemeral 'blob:' URLs are session-only and never considered durable persistent URLs.
+ * Valid durable URLs include:
+ * - relative paths (e.g. '/models/ayush.glb', './model.glb')
+ * - absolute http:// or https:// URLs with safe schemes
+ * 
+ * @param {any} url - URL or path to validate
+ * @returns {string} Safe normalized URL string, or empty string '' if invalid or temporary blob.
+ */
+export function validateAndNormalizeModelUrl(url) {
+  if (typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  // Blob URLs are ephemeral and become dead on page reload.
+  // Never treat them as durable persistent model references.
+  if (trimmed.toLowerCase().startsWith('blob:')) {
+    return '';
+  }
+
+  // Reject unsafe schemes (e.g., javascript:, data:, vbscript:)
+  if (/^(javascript|data|vbscript):/i.test(trimmed)) {
+    return '';
+  }
+
+  // Accept valid relative URLs starting with / or ./ or ../
+  if (trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../')) {
+    return trimmed;
+  }
+
+  // Validate absolute URLs
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return trimmed;
+    }
+  } catch {
+    // Malformed URL format
+  }
+
+  return '';
+}
+
+/**
+ * Safely loads romantic settings from localStorage with validation and sanitization.
+ * Stale blob URLs from older sessions are cleaned both in-memory and updated in localStorage.
+ * 
+ * @returns {typeof DEFAULT_SETTINGS}
+ */
 export function loadRomanticSettings() {
-  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  if (typeof window === 'undefined') return { ...DEFAULT_SETTINGS };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (!raw) return { ...DEFAULT_SETTINGS };
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { ...DEFAULT_SETTINGS };
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { ...DEFAULT_SETTINGS };
+    }
+
+    // Sanitize customModelUrl: cleans existing stored blob: URLs from previous sessions
+    const sanitizedModelUrl = validateAndNormalizeModelUrl(parsed.customModelUrl);
+
+    // If localStorage contained an invalid/stale blob URL, rewrite localStorage cleanly
+    if (parsed.customModelUrl && parsed.customModelUrl !== sanitizedModelUrl) {
+      try {
+        const cleaned = { ...parsed, customModelUrl: sanitizedModelUrl };
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(cleaned));
+      } catch {}
+    }
+
+    return {
+      gfName: typeof parsed.gfName === 'string' && parsed.gfName.trim() ? parsed.gfName.trim() : DEFAULT_SETTINGS.gfName,
+      ayushName: typeof parsed.ayushName === 'string' && parsed.ayushName.trim() ? parsed.ayushName.trim() : DEFAULT_SETTINGS.ayushName,
+      anniversaryDate: typeof parsed.anniversaryDate === 'string' && parsed.anniversaryDate.trim() ? parsed.anniversaryDate.trim() : DEFAULT_SETTINGS.anniversaryDate,
+      soundEnabled: typeof parsed.soundEnabled === 'boolean' ? parsed.soundEnabled : DEFAULT_SETTINGS.soundEnabled,
+      romanticMessagesEnabled: typeof parsed.romanticMessagesEnabled === 'boolean' ? parsed.romanticMessagesEnabled : DEFAULT_SETTINGS.romanticMessagesEnabled,
+      floatingEffectsEnabled: typeof parsed.floatingEffectsEnabled === 'boolean' ? parsed.floatingEffectsEnabled : DEFAULT_SETTINGS.floatingEffectsEnabled,
+      customModelUrl: sanitizedModelUrl,
+    };
   } catch {
-    return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS };
   }
 }
 
+/**
+ * Saves romantic settings to localStorage, sanitizing model URLs before saving.
+ * 
+ * @param {Object} settings
+ */
 export function saveRomanticSettings(settings) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !settings || typeof settings !== 'object') return;
   try {
-    // Blob URLs are session-only and become dead after page reload — never persist them.
+    const sanitizedModelUrl = validateAndNormalizeModelUrl(settings.customModelUrl);
     const toSave = {
       ...settings,
-      customModelUrl:
-        settings.customModelUrl && settings.customModelUrl.startsWith('blob:')
-          ? ''
-          : (settings.customModelUrl || '')
+      customModelUrl: sanitizedModelUrl
     };
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(toSave));
   } catch (e) {
@@ -53,13 +136,15 @@ export function saveRomanticSettings(settings) {
 }
 
 export function loadUnlocks() {
-  if (typeof window === 'undefined') return DEFAULT_UNLOCKS;
+  if (typeof window === 'undefined') return { ...DEFAULT_UNLOCKS };
   try {
     const raw = localStorage.getItem(UNLOCKS_KEY);
-    if (!raw) return DEFAULT_UNLOCKS;
-    return { ...DEFAULT_UNLOCKS, ...JSON.parse(raw) };
+    if (!raw) return { ...DEFAULT_UNLOCKS };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_UNLOCKS };
+    return { ...DEFAULT_UNLOCKS, ...parsed };
   } catch {
-    return DEFAULT_UNLOCKS;
+    return { ...DEFAULT_UNLOCKS };
   }
 }
 

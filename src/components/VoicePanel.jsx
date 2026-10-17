@@ -78,6 +78,13 @@ export default function VoicePanel({
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      clonedVoiceEngine.stopPlayback();
+      speechTranscriber.stop();
+    };
+  }, []);
+
   // ---------------------------------------------------------------------------
   // Pipeline 1: Voice Recognition & Cloned Voice Generation
   // ---------------------------------------------------------------------------
@@ -139,6 +146,12 @@ export default function VoicePanel({
       const res = await clonedVoiceEngine.generateSpeech(textToSpeak);
       setIsGeneratingVoice(false);
 
+      // If user pressed stop or reset while generating, discard late response safely
+      if (res.cancelled) {
+        setStatusMessage('Voice generation stopped.');
+        return;
+      }
+
       if (!res.ok && res.error) {
         setErrorMessage(res.error);
         setStatusMessage('Generation failed. Using device voice.');
@@ -175,6 +188,7 @@ export default function VoicePanel({
 
   const handleStopClonedPlayback = () => {
     clonedVoiceEngine.stopPlayback();
+    setIsGeneratingVoice(false);
     setIsClonedPlaying(false);
     onPlaybackEnd();
     onAmplitude(0);
