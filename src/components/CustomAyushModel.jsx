@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { SkeletonUtils } from 'three-stdlib';
 
 /**
  * CustomAyushModel
@@ -36,7 +36,7 @@ export default function CustomAyushModel({
 
   // Clone scene with SkeletonUtils so SkinnedMesh bones are bound to the cloned skeleton
   const clonedScene = useMemo(() => {
-    const clone = cloneSkeleton(scene);
+    const clone = SkeletonUtils.clone(scene);
 
     // Compute accurate bounding box from mesh geometries
     let box = new THREE.Box3();

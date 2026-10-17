@@ -53,5 +53,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), apiDevServerPlugin()],
+    resolve: {
+      dedupe: ['three']
+    }
   };
 });
