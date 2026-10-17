@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   soundEnabled: true,
   romanticMessagesEnabled: true,
   floatingEffectsEnabled: true,
+  customModelUrl: '', // Optional override for custom .glb file
 };
 
 export const DEFAULT_UNLOCKS = {

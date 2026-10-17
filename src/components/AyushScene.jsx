@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
-import AyushCharacter from './AyushCharacter';
+import AyushModelManager from './AyushModelManager';
 import FloatingHearts from './FloatingHearts';
 
 // Deterministic particle positions generated once
@@ -79,6 +79,7 @@ function StudioStage() {
 }
 
 export default function AyushScene({
+  customModelUrl,
   currentAction,
   onTapPart,
   isHovered,
@@ -119,8 +120,9 @@ export default function AyushScene({
         {floatingEffectsEnabled && <FloatingParticles />}
         {floatingEffectsEnabled && <FloatingHearts burstTrigger={heartBurst} />}
 
-        {/* Central Cartoon Ayush Character */}
-        <AyushCharacter
+        {/* Central Character (Custom Rigged GLB or Fallback Procedural Chibi) */}
+        <AyushModelManager
+          customModelUrl={customModelUrl}
           currentAction={currentAction}
           onTapPart={onTapPart}
           isHovered={isHovered}

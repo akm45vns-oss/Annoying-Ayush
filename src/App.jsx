@@ -440,6 +440,7 @@ export default function App() {
 
           {/* 3D Scene prominently focused on Ayush */}
           <AyushScene
+            customModelUrl={settings.customModelUrl}
             currentAction={currentAction}
             onTapPart={handleCharacterTap}
             isHovered={isHovered}

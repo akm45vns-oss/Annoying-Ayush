@@ -205,6 +205,49 @@ export default function RomanticSettingsModal({
               />
             </label>
           </section>
+
+          {/* 4. 3D Avatar Model Section */}
+          <section className="settings-section">
+            <h3 className="section-title">
+              <Sparkles size={15} className="title-icon" />
+              <span>3D Character Avatar</span>
+            </h3>
+
+            <div className="avatar-model-config">
+              <p className="model-config-hint">
+                Active: <strong>{formData.customModelUrl ? 'Custom Model (Previewing)' : 'Standard Chibi Avatar'}</strong>
+              </p>
+              <div className="model-file-controls">
+                <label className="model-upload-btn" title="Select a .glb file to preview in game">
+                  <span>📁 Preview .GLB File</span>
+                  <input
+                    type="file"
+                    accept=".glb,.gltf"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const url = URL.createObjectURL(file);
+                        handleChange('customModelUrl', url);
+                      }
+                    }}
+                  />
+                </label>
+                {formData.customModelUrl && (
+                  <button
+                    type="button"
+                    className="model-reset-btn"
+                    onClick={() => handleChange('customModelUrl', '')}
+                  >
+                    Reset to Default
+                  </button>
+                )}
+              </div>
+              <p className="model-path-note">
+                To set your permanent avatar: place your rigged model in <code>public/models/ayush.glb</code>.
+              </p>
+            </div>
+          </section>
         </div>
 
         {/* Footer Actions */}

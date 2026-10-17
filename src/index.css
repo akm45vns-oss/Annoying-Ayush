@@ -1102,6 +1102,77 @@ html, body {
 .text-green { color: #2e7d32; }
 .text-yellow { color: #f57f17; }
 
+/* 3D Model Settings */
+.avatar-model-config {
+  background: #fff8fa;
+  border: 1px dashed #ffb3c6;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-config-hint {
+  font-size: 0.76rem;
+  color: var(--text-dark);
+}
+
+.model-config-hint strong {
+  color: var(--primary-pink);
+}
+
+.model-file-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ba68c8 0%, #ab47bc 100%);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(171, 71, 188, 0.25);
+  transition: all 0.2s ease;
+}
+
+.model-upload-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(171, 71, 188, 0.35);
+}
+
+.model-reset-btn {
+  padding: 6px 12px;
+  border-radius: 14px;
+  border: 1px solid #ffccd5;
+  background: #ffffff;
+  color: #c2185b;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.model-path-note {
+  font-size: 0.68rem;
+  color: #8c7f92;
+  line-height: 1.35;
+}
+
+.model-path-note code {
+  background: #ffebee;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #c2185b;
+  font-size: 0.68rem;
+}
+
 .modal-footer-actions {
   display: flex;
   align-items: center;
