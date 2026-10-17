@@ -37,30 +37,61 @@ export default function CustomAyushModel({
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);
 
+    // Compute accurate bounding box from mesh geometries
+    let box = new THREE.Box3();
+    let hasGeometry = false;
+
     clone.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        if (child.geometry) {
+          child.geometry.computeBoundingBox();
+          const geomBox = child.geometry.boundingBox.clone();
+          child.updateWorldMatrix(true, false);
+          geomBox.applyMatrix4(child.matrixWorld);
+          box.union(geomBox);
+          hasGeometry = true;
+        }
       }
     });
 
-    // Auto-normalize scale & position: target height ~1.82 units, base anchored at y = -0.88
-    const box = new THREE.Box3().setFromObject(clone);
+    if (!hasGeometry || box.isEmpty()) {
+      box.setFromObject(clone);
+    }
+
     const size = box.getSize(new THREE.Vector3());
+    const rawHeight = size.y > 0.05 ? size.y : 1;
 
-    const targetHeight = 1.82;
-    const currentHeight = size.y || 1;
-    const scaleFactor = targetHeight / currentHeight;
-
+    // Prominent, mobile-friendly height (~2.18 units tall)
+    const targetHeight = 2.18;
+    const scaleFactor = targetHeight / rawHeight;
     clone.scale.setScalar(scaleFactor);
 
-    // Recompute after scaling to align feet to y = -0.88
-    box.setFromObject(clone);
-    const scaledCenter = box.getCenter(new THREE.Vector3());
+    // Recompute bounding box after scaling
+    box = new THREE.Box3();
+    hasGeometry = false;
+    clone.updateMatrixWorld(true);
+
+    clone.traverse((child) => {
+      if (child.isMesh && child.geometry) {
+        const geomBox = child.geometry.boundingBox.clone();
+        geomBox.applyMatrix4(child.matrixWorld);
+        box.union(geomBox);
+        hasGeometry = true;
+      }
+    });
+
+    if (!hasGeometry || box.isEmpty()) {
+      box.setFromObject(clone);
+    }
+
+    const center = box.getCenter(new THREE.Vector3());
     const bottomY = box.min.y;
 
-    clone.position.x = -scaledCenter.x;
-    clone.position.z = -scaledCenter.z;
+    // Anchor feet directly at podium surface (y = -0.88)
+    clone.position.x = -center.x;
+    clone.position.z = -center.z;
     clone.position.y = -0.88 - bottomY;
 
     return clone;
@@ -77,16 +108,16 @@ export default function CustomAyushModel({
         morphs.push(child);
       } else if (child.isBone) {
         const name = child.name;
-        if (name === 'Head') bones.head = child;
-        else if (name === 'Neck') bones.neck = child;
-        else if (name === 'Spine' || name === 'Spine1' || name === 'Spine2') bones.spine = child;
-        else if (name === 'LeftArm') bones.leftArm = child;
-        else if (name === 'RightArm') bones.rightArm = child;
-        else if (name === 'LeftForeArm') bones.leftForeArm = child;
-        else if (name === 'RightForeArm') bones.rightForeArm = child;
-        else if (name === 'LeftHand') bones.leftHand = child;
-        else if (name === 'RightHand') bones.rightHand = child;
-        else if (name === 'Hips') bones.hips = child;
+        if (name === 'Head' || name.toLowerCase().includes('head')) bones.head = child;
+        else if (name === 'Neck' || name.toLowerCase().includes('neck')) bones.neck = child;
+        else if (name.includes('Spine') || name === 'Chest' || name.toLowerCase().includes('chest')) bones.spine = child;
+        else if (name === 'LeftShoulder' || name === 'LeftArm') bones.leftArm = child;
+        else if (name === 'RightShoulder' || name === 'RightArm') bones.rightArm = child;
+        else if (name === 'LeftElbow' || name === 'LeftForeArm') bones.leftForeArm = child;
+        else if (name === 'RightElbow' || name === 'RightForeArm') bones.rightForeArm = child;
+        else if (name === 'LeftWrist' || name === 'LeftHand') bones.leftHand = child;
+        else if (name === 'RightWrist' || name === 'RightHand') bones.rightHand = child;
+        else if (name === 'Hips' || name.toLowerCase().includes('hips')) bones.hips = child;
       }
     });
 
@@ -97,39 +128,18 @@ export default function CustomAyushModel({
   // Setup animations if present
   const { actions, names } = useAnimations(animations, groupRef);
 
-  // Switch animation clips based on currentAction
+  // Play animation clips (e.g. Walk from my_3d_character_walking.glb)
   useEffect(() => {
     if (!actions || names.length === 0) return;
 
-    // Match action name (case-insensitive substring)
-    const findClip = (actionKey) => {
-      return names.find((name) => name.toLowerCase().includes(actionKey.toLowerCase()));
-    };
-
-    let targetClipName = findClip(currentAction);
-
-    // Fallbacks for common animation naming
-    if (!targetClipName) {
-      if (currentAction === 'talking') targetClipName = findClip('talk') || findClip('speak');
-      else if (currentAction === 'laugh') targetClipName = findClip('laugh') || findClip('happy');
-      else if (currentAction === 'kiss') targetClipName = findClip('kiss') || findClip('love');
-      else if (currentAction === 'hug') targetClipName = findClip('hug') || findClip('cuddle');
-      else if (currentAction === 'dance') targetClipName = findClip('dance') || findClip('jump');
-    }
-
-    // Default to idle if no specific clip matched
-    if (!targetClipName) {
-      targetClipName = findClip('idle') || names[0];
-    }
-
-    if (targetClipName && actions[targetClipName]) {
-      // Fade out previous clips, fade in target
-      Object.keys(actions).forEach((name) => {
-        if (name !== targetClipName) {
-          actions[name]?.fadeOut(0.3);
-        }
-      });
-      actions[targetClipName]?.reset().fadeIn(0.3).play();
+    const walkAction = actions['Walk'] || actions['walk'] || actions[names[0]];
+    if (walkAction) {
+      if (currentAction === 'dance') {
+        walkAction.setEffectiveTimeScale(1.35);
+      } else {
+        walkAction.setEffectiveTimeScale(0.85);
+      }
+      walkAction.reset().fadeIn(0.25).play();
     }
   }, [currentAction, actions, names]);
 
@@ -360,37 +370,37 @@ export default function CustomAyushModel({
       {/* Invisible Interactive Hitboxes covering Head, Cheeks/Face, and Torso */}
       {/* Head hitbox */}
       <mesh
-        position={[0, 0.72, 0]}
+        position={[0, 1.05, 0]}
         visible={false}
         onPointerDown={(e) => handlePointerDown(e, 'head')}
         onPointerUp={(e) => handlePointerUp(e, 'head')}
         onPointerCancel={handlePointerCancel}
       >
-        <sphereGeometry args={[0.38, 12, 12]} />
+        <sphereGeometry args={[0.3, 12, 12]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
 
       {/* Cheeks/Nose hitbox */}
       <mesh
-        position={[0, 0.62, 0.22]}
+        position={[0, 0.96, 0.16]}
         visible={false}
         onPointerDown={(e) => handlePointerDown(e, 'cheeks')}
         onPointerUp={(e) => handlePointerUp(e, 'cheeks')}
         onPointerCancel={handlePointerCancel}
       >
-        <boxGeometry args={[0.42, 0.24, 0.25]} />
+        <boxGeometry args={[0.32, 0.2, 0.2]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
 
       {/* Torso / Body hitbox */}
       <mesh
-        position={[0, 0.05, 0]}
+        position={[0, 0.2, 0]}
         visible={false}
         onPointerDown={(e) => handlePointerDown(e, 'body')}
         onPointerUp={(e) => handlePointerUp(e, 'body')}
         onPointerCancel={handlePointerCancel}
       >
-        <cylinderGeometry args={[0.35, 0.38, 0.85, 12]} />
+        <cylinderGeometry args={[0.32, 0.35, 0.85, 12]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
     </group>
