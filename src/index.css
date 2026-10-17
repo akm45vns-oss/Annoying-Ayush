@@ -1049,6 +1049,12 @@ html, body {
   border: 1px solid var(--color-border);
 }
 
+.checking-badge {
+  background: var(--color-lavender-soft);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-lavender);
+}
+
 .chat-header-actions {
   display: flex;
   align-items: center;

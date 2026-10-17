@@ -52,7 +52,8 @@ class ClonedVoiceEngine {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: cleanText })
+        body: JSON.stringify({ text: cleanText }),
+        signal: AbortSignal.timeout(15000) // Bound TTS generation to 15 seconds max
       });
 
       const contentType = res.headers.get('content-type') || '';

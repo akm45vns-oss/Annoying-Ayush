@@ -17,6 +17,16 @@ const MAX_REQUESTS_PER_WINDOW = 20;
 
 function checkRateLimit(ip) {
   const now = Date.now();
+
+  // Prune entries that have expired to prevent unbounded map growth.
+  if (rateLimitMap.size > 500) {
+    for (const [key, record] of rateLimitMap.entries()) {
+      if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
+        rateLimitMap.delete(key);
+      }
+    }
+  }
+
   const record = rateLimitMap.get(ip) || { count: 0, startTime: now };
 
   if (now - record.startTime > RATE_LIMIT_WINDOW_MS) {
@@ -138,7 +148,8 @@ export async function handleTtsRequest(req, res) {
             style: 0.25,
             use_speaker_boost: true
           }
-        })
+        }),
+        signal: AbortSignal.timeout(15000) // ElevenLabs generation deadline
       });
 
       if (!response.ok) {
@@ -176,7 +187,8 @@ export async function handleTtsRequest(req, res) {
           model,
           input: text,
           voice
-        })
+        }),
+        signal: AbortSignal.timeout(12000) // OpenAI TTS deadline
       });
 
       if (!response.ok) {

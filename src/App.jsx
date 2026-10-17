@@ -7,6 +7,7 @@ import RomanticSettingsModal from './components/RomanticSettingsModal';
 import SecretLetterModal from './components/SecretLetterModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
+import { clonedVoiceEngine } from './utils/clonedVoiceEngine';
 import { 
   getTimeAwareGreeting, 
   formatDialogue,
@@ -137,12 +138,21 @@ export default function App() {
     setTalkingVolume(vol);
   }, []);
 
-  // Stop active voice playback if interrupting with another tap or action
+  // Stop ALL active voice playback (both pipelines) if interrupting with another tap or action
   const interruptVoiceIfPlaying = useCallback(() => {
+    let didStop = false;
     if (voiceEngine.isPlaying) {
       voiceEngine.stopPlayback();
-      setTalkingVolume(0);
+      didStop = true;
     }
+    if (clonedVoiceEngine.isPlaying) {
+      clonedVoiceEngine.stopPlayback();
+      didStop = true;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
+    if (didStop) setTalkingVolume(0);
   }, []);
 
   // Reset character and state cleanly
@@ -345,7 +355,7 @@ export default function App() {
   // Sound toggle with instant sound feedback on unmute
   const handleToggleMute = useCallback(() => {
     const nextMuted = soundManager.toggleMute();
-    setIsMuted(nextMuted);
+    // isMuted is derived from settings.soundEnabled — update settings only
     const updatedSettings = { ...settings, soundEnabled: !nextMuted };
     setSettings(updatedSettings);
     saveRomanticSettings(updatedSettings);
@@ -410,6 +420,7 @@ export default function App() {
       if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
       if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
       voiceEngine.cleanup();
+      clonedVoiceEngine.cleanup();
     };
   }, []);
 

@@ -33,12 +33,15 @@ export class SpeechTranscriber {
       this.recognition.lang = 'en-US'; // Supports natural English / Hinglish speech
 
       this.recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+        // Always reconstruct the full transcript from position 0 to get the complete
+        // utterance so far. Using only event.resultIndex delta and += causes interim
+        // results to compound into garbled text if the callback replaces state each time.
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0].transcript;
         }
         if (this.onResultCallback) {
-          this.onResultCallback(transcript);
+          this.onResultCallback(fullTranscript.trim());
         }
       };
 

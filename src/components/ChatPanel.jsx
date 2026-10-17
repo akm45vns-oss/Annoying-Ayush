@@ -108,16 +108,17 @@ export default function ChatPanel({
       timestamp: Date.now()
     };
 
+    // Build bounded conversation history from the PREVIOUS messages (before the new user msg),
+    // so the current user turn is not duplicated in both history[] and the message field.
+    const historyPayload = messages.slice(-6).map((m) => ({
+      role: m.sender === 'user' ? 'user' : 'assistant',
+      content: m.text
+    }));
+
     const nextMessages = [...messages, newUserMsg];
     setMessages(nextMessages);
     setInputText('');
     setIsTyping(true);
-
-    // Prepare bounded conversation history for AI API context (last 6 messages)
-    const historyPayload = nextMessages.slice(-6).map((m) => ({
-      role: m.sender === 'user' ? 'user' : 'assistant',
-      content: m.text
-    }));
 
     try {
       // Call server-side endpoint (/api/chat)
@@ -220,12 +221,64 @@ export default function ChatPanel({
   };
 
   const handleRetry = () => {
-    if (lastFailedMessage) {
-      const msg = lastFailedMessage;
-      setLastFailedMessage(null);
-      setErrorMessage('');
-      handleSend(msg);
-    }
+    if (!lastFailedMessage) return;
+    // The user bubble is already in the messages list from the first send attempt.
+    // We must NOT call handleSend() here — that would push a second identical user bubble.
+    // Instead, directly re-issue the API call with the current messages state.
+    const text = lastFailedMessage;
+    setLastFailedMessage(null);
+    setErrorMessage('');
+    setIsTyping(true);
+
+    const historyPayload = messages.slice(-7, -1).map((m) => ({
+      role: m.sender === 'user' ? 'user' : 'assistant',
+      content: m.text
+    }));
+
+    isSubmittingRef.current = true;
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history: historyPayload, gfName, ayushName }),
+      signal: AbortSignal.timeout(13000)
+    })
+      .then((res) => res.json().catch(() => null).then((data) => ({ res, data })))
+      .then(({ res, data }) => {
+        if (res.ok && data && data.ok) {
+          const isOffline = !!data.isOfflineFallback;
+          setApiStatus(isOffline ? 'offline' : 'live');
+          if (data.provider) setActiveProvider(data.provider);
+          const replyText = data.reply;
+          const reaction = data.reaction || detectCharacterReaction(replyText);
+          setMessages((prev) => [
+            ...prev,
+            { id: 'reply-' + Date.now(), sender: 'ayush', text: replyText, timestamp: Date.now(), isOfflineFallback: isOffline, provider: data.provider || (isOffline ? 'offline' : 'ai') }
+          ]);
+          soundManager.playChime();
+          onAyushReply(replyText, reaction);
+        } else {
+          const fallback = generateOfflineFallback(text, gfName, ayushName);
+          setMessages((prev) => [
+            ...prev,
+            { id: 'reply-' + Date.now(), sender: 'ayush', text: fallback.reply, timestamp: Date.now(), isOfflineFallback: true }
+          ]);
+          setApiStatus('offline');
+          setActiveProvider('offline');
+          soundManager.playChime();
+          onAyushReply(fallback.reply, fallback.reaction);
+        }
+      })
+      .catch((err) => {
+        console.warn('Retry failed:', err.message);
+        setLastFailedMessage(text);
+        setErrorMessage('Still could not reach AI server. Tap "Use Offline Answer" to continue.');
+        soundManager.playBoing();
+      })
+      .finally(() => {
+        setIsTyping(false);
+        isSubmittingRef.current = false;
+      });
   };
 
   const handleKeyDown = (e) => {
@@ -256,6 +309,10 @@ export default function ChatPanel({
               {apiStatus === 'live' ? (
                 <span className="status-badge live-badge">
                   ⚡ Live AI {activeProvider ? `(${activeProvider.toUpperCase()})` : ''}
+                </span>
+              ) : apiStatus === 'checking' ? (
+                <span className="status-badge checking-badge" title="Testing AI connection...">
+                  ⏳ Connecting...
                 </span>
               ) : (
                 <span className="status-badge offline-badge" title="Pre-programmed failover mode active.">

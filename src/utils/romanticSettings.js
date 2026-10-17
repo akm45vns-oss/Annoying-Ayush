@@ -38,7 +38,15 @@ export function loadRomanticSettings() {
 export function saveRomanticSettings(settings) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    // Blob URLs are session-only and become dead after page reload — never persist them.
+    const toSave = {
+      ...settings,
+      customModelUrl:
+        settings.customModelUrl && settings.customModelUrl.startsWith('blob:')
+          ? ''
+          : (settings.customModelUrl || '')
+    };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(toSave));
   } catch (e) {
     console.warn('Could not save settings to localStorage:', e);
   }
@@ -80,9 +88,19 @@ export function resetAllSettingsAndUnlocks() {
 export function calculateDaysTogether(anniversaryDate) {
   if (!anniversaryDate) return null;
   try {
-    const start = new Date(anniversaryDate);
+    // Parse as LOCAL date to avoid UTC midnight off-by-one in non-UTC timezones.
+    // anniversaryDate is expected in 'YYYY-MM-DD' format from an <input type="date">.
+    const parts = anniversaryDate.split('-');
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts.map(Number);
+    if (!year || !month || !day) return null;
+
+    const start = new Date(year, month - 1, day); // local midnight
     const now = new Date();
-    const diffTime = now.getTime() - start.getTime();
+    // Compare calendar dates (ignore time of day for accurate day count)
+    const startDateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffTime = nowDateOnly.getTime() - startDateOnly.getTime();
     if (diffTime < 0) return null;
     return Math.floor(diffTime / (1000 * 60 * 60 * 24));
   } catch {
