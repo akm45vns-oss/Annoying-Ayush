@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Heart, Info, X, Settings } from 'lucide-react';
+import { Heart, Info, X, Settings, MessageCircle } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
 export default function Header({
   onOpenSettings,
+  onOpenChat,
   onUnlockSecretHeart,
   daysTogether = null,
   gfName = 'Babe',
@@ -52,6 +53,19 @@ export default function Header({
             </h1>
 
             <div className="header-actions">
+              <button 
+                type="button"
+                className="icon-action-btn chat-toggle-btn" 
+                onClick={() => {
+                  soundManager.playPop();
+                  if (onOpenChat) onOpenChat();
+                }}
+                title="Chat with Ayush 💬"
+                aria-label="Open chat"
+              >
+                <MessageCircle size={18} />
+              </button>
+
               <button 
                 type="button"
                 className="icon-action-btn settings-toggle-btn" 

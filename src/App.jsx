@@ -384,6 +384,25 @@ export default function App() {
     setIsSecretLetterOpen(true);
   }, [unlocks]);
 
+  // Handle Ayush AI / Fallback Chat Response Animation & Speech Excerpt
+  const handleAyushChatReply = useCallback((replyText, reaction) => {
+    if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
+    
+    // Animate the character with the inferred reaction or animated talking
+    const validReaction = reaction || 'talking';
+    setCurrentAction(validReaction);
+
+    // If affectionate reaction, burst hearts
+    if (settings.floatingEffectsEnabled && (validReaction === 'kiss' || validReaction === 'hug' || validReaction === 'cuddle')) {
+      setHeartBurst((b) => b + 1);
+    }
+
+    // Display a short excerpt in the 3D speech bubble above Ayush's head
+    const excerpt = replyText.length > 70 ? replyText.slice(0, 68) + '...' : replyText;
+    showSpeech(excerpt, 3600);
+    scheduleReturnToIdle(3600);
+  }, [scheduleReturnToIdle, settings.floatingEffectsEnabled, showSpeech]);
+
   // Clean up all active timers and audio on unmount
   useEffect(() => {
     return () => {
@@ -404,6 +423,7 @@ export default function App() {
       <main className="game-container">
         <Header 
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenChat={() => setActiveTab('chat')}
           onUnlockSecretHeart={handleUnlockSecretHeart}
           daysTogether={daysTogether}
           gfName={settings.gfName}
@@ -444,6 +464,9 @@ export default function App() {
           onPlaybackStart={handlePlaybackStart}
           onPlaybackEnd={handlePlaybackEnd}
           onAmplitude={handleAmplitude}
+          gfName={settings.gfName}
+          ayushName={settings.ayushName}
+          onAyushReply={handleAyushChatReply}
         />
       </main>
 

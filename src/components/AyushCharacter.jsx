@@ -182,6 +182,12 @@ export default function AyushCharacter({
       targetMouthScaleX = 1.0 + talkingVolume * 0.4;
       targetMouthScaleZ = 1.0 + talkingVolume * 0.8;
       targetEyebrowY = 0.22 + talkingVolume * 0.04;
+    } else if (currentAction === 'talking') {
+      // Expressive mouth movement during text chat delivery
+      const talkCycle = Math.abs(Math.sin(t * 16));
+      targetMouthScaleY = 1.0 + talkCycle * 1.35;
+      targetMouthScaleX = 1.0 + talkCycle * 0.25;
+      targetEyebrowY = 0.21 + Math.sin(t * 8) * 0.03;
     } else if (currentAction === 'surprised') {
       targetEyebrowY = 0.24;
       targetEyebrowRot = 0.22;
@@ -252,12 +258,17 @@ export default function AyushCharacter({
     let targetRightArmRotX = -Math.sin(t * 1.8) * 0.06;
     let targetRightArmRotZ = -0.2 - Math.cos(t * 2) * 0.03;
 
-    // Expressive head gesture while talking
+    // Expressive head gesture while talking (voice repeat or AI text chat)
     if (talkingVolume > 0.05) {
       targetHeadRotX += Math.sin(t * 12) * talkingVolume * 0.07;
       targetHeadRotZ += Math.cos(t * 8) * talkingVolume * 0.04;
       targetLeftArmRotZ += talkingVolume * 0.12;
       targetRightArmRotZ -= talkingVolume * 0.12;
+    } else if (currentAction === 'talking') {
+      targetHeadRotX += Math.sin(t * 7) * 0.05;
+      targetHeadRotZ += Math.cos(t * 5) * 0.035;
+      targetLeftArmRotZ = 0.45 + Math.sin(t * 5) * 0.12;
+      targetRightArmRotZ = -0.45 - Math.cos(t * 5) * 0.12;
     }
 
     let targetGroupZ = 0;

@@ -10,10 +10,12 @@ import {
   Flame,
   Mic,
   HeartHandshake,
-  Moon
+  Moon,
+  MessageCircle
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 import VoicePanel from './VoicePanel';
+import ChatPanel from './ChatPanel';
 
 export default function InteractionMenu({
   onTriggerAction,
@@ -28,7 +30,10 @@ export default function InteractionMenu({
   setVoiceMode,
   onPlaybackStart,
   onPlaybackEnd,
-  onAmplitude
+  onAmplitude,
+  gfName = 'Babe',
+  ayushName = 'Ayush',
+  onAyushReply = () => {}
 }) {
   const actions = [
     {
@@ -82,6 +87,7 @@ export default function InteractionMenu({
   ];
 
   const getMoodLabel = () => {
+    if (activeTab === 'chat') return '💬 Chatting with you';
     if (annoyanceCount >= 5) return '😤 Annoyance: High!';
     if (annoyanceCount >= 3) return '⚡ Teased!';
     if (currentAction === 'kiss') return '💋 Sending Kisses';
@@ -92,13 +98,13 @@ export default function InteractionMenu({
     if (currentAction === 'dance') return '🕺 Grooving!';
     if (currentAction === 'surprised') return '😲 Surprised!';
     if (currentAction === 'boop') return '👃 Booped!';
-    if (currentAction === 'talking') return '🎙️ Repeating!';
+    if (currentAction === 'talking') return '🎙️ Speaking!';
     return '✨ Ready for love';
   };
 
   return (
-    <div className="interaction-menu-container">
-      {/* 1. Category Switcher Tabs: Play & Tease vs Voice Repeat */}
+    <div className={`interaction-menu-container ${activeTab === 'chat' ? 'chat-active' : ''}`}>
+      {/* 1. Category Switcher Tabs: Play, Voice Repeat, AI Chat */}
       <div className="menu-nav-tabs">
         <button
           type="button"
@@ -123,41 +129,55 @@ export default function InteractionMenu({
           <Mic size={14} />
           <span>Voice & Repeat 🎙️</span>
         </button>
-      </div>
 
-      {/* 2. Secondary Meta Controls Bar */}
-      <div className="menu-meta-bar">
-        <button 
-          type="button" 
-          className={`meta-button ${!isMuted ? 'sound-active' : ''}`}
-          onClick={onToggleMute}
-          title={isMuted ? "Unmute sounds" : "Mute sounds"}
-        >
-          {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          <span>{isMuted ? "Muted" : "Sound ON"}</span>
-        </button>
-
-        <span className={`meta-badge ${annoyanceCount >= 3 ? 'annoyed-badge' : ''}`}>
-          {annoyanceCount >= 3 && <Flame size={12} className="flame-icon" />}
-          {getMoodLabel()}
-        </span>
-
-        <button 
-          type="button" 
-          className="meta-button reset-btn"
+        <button
+          type="button"
+          className={`nav-tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
           onClick={() => {
             soundManager.playPop();
-            onReset();
+            setActiveTab('chat');
           }}
-          title="Reset to neutral idle"
         >
-          <RotateCcw size={15} />
-          <span>Reset</span>
+          <MessageCircle size={14} />
+          <span>AI Chat 💬</span>
         </button>
       </div>
 
+      {/* 2. Secondary Meta Controls Bar (Hidden in chat tab to maximize message reading area) */}
+      {activeTab !== 'chat' && (
+        <div className="menu-meta-bar">
+          <button 
+            type="button" 
+            className={`meta-button ${!isMuted ? 'sound-active' : ''}`}
+            onClick={onToggleMute}
+            title={isMuted ? "Unmute sounds" : "Mute sounds"}
+          >
+            {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            <span>{isMuted ? "Muted" : "Sound ON"}</span>
+          </button>
+
+          <span className={`meta-badge ${annoyanceCount >= 3 ? 'annoyed-badge' : ''}`}>
+            {annoyanceCount >= 3 && <Flame size={12} className="flame-icon" />}
+            {getMoodLabel()}
+          </span>
+
+          <button 
+            type="button" 
+            className="meta-button reset-btn"
+            onClick={() => {
+              soundManager.playPop();
+              onReset();
+            }}
+            title="Reset to neutral idle"
+          >
+            <RotateCcw size={15} />
+            <span>Reset</span>
+          </button>
+        </div>
+      )}
+
       {/* 3. Panel Content based on Active Tab */}
-      {activeTab === 'play' ? (
+      {activeTab === 'play' && (
         <div className="action-buttons-grid action-buttons-6">
           {actions.map((act) => {
             const Icon = act.icon;
@@ -184,7 +204,9 @@ export default function InteractionMenu({
             );
           })}
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'voice' && (
         <VoicePanel
           voiceMode={voiceMode}
           setVoiceMode={setVoiceMode}
@@ -192,6 +214,16 @@ export default function InteractionMenu({
           onPlaybackEnd={onPlaybackEnd}
           onAmplitude={onAmplitude}
           isMuted={isMuted}
+        />
+      )}
+
+      {activeTab === 'chat' && (
+        <ChatPanel
+          isOpen={true}
+          onClose={() => setActiveTab('play')}
+          gfName={gfName}
+          ayushName={ayushName}
+          onAyushReply={onAyushReply}
         />
       )}
     </div>
