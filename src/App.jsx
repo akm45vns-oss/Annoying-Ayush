@@ -49,22 +49,27 @@ export default function App() {
   const [heartBurst, setHeartBurst] = useState(0);
   const [annoyanceCount, setAnnoyanceCount] = useState(0);
 
-  // Milestone 3: Voice repeat state (hands-free Talking Tom default)
+  // Milestone 3 & 4: Voice repeat state (authoritative Talking Tom lifecycle)
   const [activeTab, setActiveTab] = useState('play'); // 'play' | 'chat'
+  const prevTabRef = useRef(activeTab);
   const voiceMode = settings.voiceMode || 'funny';
   const [talkingVolume, setTalkingVolume] = useState(0);
-  const [isListening, setIsListening] = useState(
-    () => talkingTomController.isExplicitlyEnabled && talkingTomController.state === LISTENING_STATES.LISTENING
-  );
+  const [listeningState, setListeningState] = useState(() => talkingTomController.state);
   const [micErrorMessage, setMicErrorMessage] = useState('');
 
-  // Sync isListening with talkingTomController state events
+  // Authoritative active status: True whenever continuous voice engine is running
+  const isListening = listeningState === LISTENING_STATES.LISTENING ||
+                      listeningState === LISTENING_STATES.STARTING ||
+                      listeningState === LISTENING_STATES.PROCESSING ||
+                      listeningState === LISTENING_STATES.SPEAKING;
+
+  // Sync listeningState with talkingTomController state events
   useEffect(() => {
     const handleState = (state, detail = {}) => {
-      setIsListening(talkingTomController.isExplicitlyEnabled && state === LISTENING_STATES.LISTENING);
+      setListeningState(state);
       if (state === LISTENING_STATES.ERROR && detail.message) {
         setMicErrorMessage(detail.message);
-      } else if (state === LISTENING_STATES.LISTENING) {
+      } else if (state === LISTENING_STATES.LISTENING || state === LISTENING_STATES.PROCESSING || state === LISTENING_STATES.SPEAKING) {
         setMicErrorMessage('');
       }
     };
@@ -73,6 +78,11 @@ export default function App() {
       talkingTomController.removeStateListener(handleState);
     };
   }, []);
+
+  // Sync recognition language preference with controller
+  useEffect(() => {
+    talkingTomController.setLanguage(settings.recognitionLanguage || 'auto');
+  }, [settings.recognitionLanguage]);
 
   // Hands-free auto-start on load if previously opted in and microphone permission is already granted
   useEffect(() => {
@@ -231,11 +241,15 @@ export default function App() {
     };
   }, [settings.voiceMode, voiceMode, handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
 
-  // Pause continuous repeat during AI Chat to prevent audio competition
+  // Pause continuous repeat during AI Chat to prevent audio competition (strictly on tab transition)
   useEffect(() => {
+    if (prevTabRef.current === activeTab) return;
+    const prev = prevTabRef.current;
+    prevTabRef.current = activeTab;
+
     if (activeTab === 'chat') {
       talkingTomController.pauseListening();
-    } else {
+    } else if (prev === 'chat' && activeTab === 'play') {
       talkingTomController.resumeListening();
     }
   }, [activeTab]);

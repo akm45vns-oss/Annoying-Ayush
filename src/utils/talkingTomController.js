@@ -13,6 +13,8 @@
 
 export const LISTENING_STATES = {
   IDLE: 'idle',
+  REQUESTING_PERMISSION: 'requesting_permission',
+  STARTING: 'starting',
   LISTENING: 'listening',
   PROCESSING: 'processing',
   SPEAKING: 'speaking',
@@ -22,13 +24,18 @@ export const LISTENING_STATES = {
 
 const OPT_IN_STORAGE_KEY = 'ayush_continuous_listening_opted_in';
 
+let permissionQueryInFlight = false;
 export async function checkMicrophonePermission() {
+  if (permissionQueryInFlight) return 'prompt';
   if (typeof navigator !== 'undefined' && navigator.permissions && navigator.permissions.query) {
     try {
+      permissionQueryInFlight = true;
       const status = await navigator.permissions.query({ name: 'microphone' });
       return status.state; // 'granted' | 'prompt' | 'denied'
     } catch {
       return 'prompt';
+    } finally {
+      permissionQueryInFlight = false;
     }
   }
   return 'prompt';
@@ -37,7 +44,8 @@ export async function checkMicrophonePermission() {
 export class TalkingTomController {
   constructor(options = {}) {
     this.options = {
-      lang: 'en-US',
+      lang: 'hi-IN',
+      recognitionLanguage: 'auto', // 'auto' | 'hi-IN' | 'hinglish' | 'en-IN' | 'bho-IN'
       silenceThresholdMs: 1100,
       postSpeechCooldownMs: 500,
       dedupWindowMs: 3000,
@@ -51,6 +59,7 @@ export class TalkingTomController {
     this.isExplicitlyEnabled = false;
     this.wasListeningBeforeHidden = false;
     this.wasListeningBeforeInterruption = false;
+    this.sessionGeneration = 0;
 
     // Phrase tracking & deduplication
     this.lastProcessedPhrase = '';
@@ -110,22 +119,69 @@ export class TalkingTomController {
   }
 
   /**
+   * Resolve an internal recognition language setting to an optimal SpeechRecognition locale
+   */
+  resolveRecognitionLocale(langSetting = this.options.recognitionLanguage) {
+    switch (langSetting) {
+      case 'hi-IN':
+        return 'hi-IN';
+      case 'en-IN':
+        return 'en-IN';
+      case 'hinglish':
+        // Google Speech Recognition / Web Speech API uses hi-IN with bilingual English/Hindi model
+        return 'hi-IN';
+      case 'bho-IN':
+        // Native Bhojpuri locale where browser supports it; falls back cleanly to hi-IN
+        return 'bho-IN';
+      case 'auto':
+      default: {
+        if (typeof navigator !== 'undefined' && navigator.language) {
+          const navLang = navigator.language.toLowerCase();
+          if (navLang.startsWith('hi')) return 'hi-IN';
+          if (navLang.startsWith('bho')) return 'bho-IN';
+          if (navLang === 'en-in') return 'en-IN';
+        }
+        // Default to Indian English / Hindi-ready Indian locale
+        return 'hi-IN';
+      }
+    }
+  }
+
+  /**
+   * Set user language preference cleanly without bouncing active microphone sessions
+   */
+  setLanguage(langSetting) {
+    this.options.recognitionLanguage = langSetting;
+    const resolvedLocale = this.resolveRecognitionLocale(langSetting);
+    this.options.lang = resolvedLocale;
+    if (this.recognition) {
+      try {
+        this.recognition.lang = resolvedLocale;
+      } catch {}
+    }
+  }
+
+  /**
    * Initialize or reuse the underlying SpeechRecognition instance
    */
   initRecognition() {
     if (!this.isSupported()) return false;
-    if (this.recognition) return true;
+    if (this.recognition) {
+      this.recognition.lang = this.resolveRecognitionLocale(this.options.recognitionLanguage);
+      return true;
+    }
 
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     try {
       this.recognition = new SpeechRec();
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
-      this.recognition.lang = this.options.lang;
+      this.recognition.lang = this.resolveRecognitionLocale(this.options.recognitionLanguage);
 
+      this.recognition.onstart = () => this.handleStart();
       this.recognition.onresult = (event) => this.handleResult(event);
       this.recognition.onerror = (event) => this.handleError(event);
-      this.recognition.onend = () => this.handleEnd();
+      this.recognition.onend = () => this.handleEnd(this.sessionGeneration);
 
       if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -157,7 +213,7 @@ export class TalkingTomController {
   }
 
   /**
-   * User explicitly enables continuous listening
+   * User explicitly enables continuous listening (Idempotent)
    */
   startListening() {
     if (!this.isSupported()) {
@@ -170,6 +226,18 @@ export class TalkingTomController {
 
     this.isExplicitlyEnabled = true;
     this.setOptedIn(true);
+
+    // If already actively running, do not duplicate start
+    if (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING) {
+      return true;
+    }
+
+    if (this.state === LISTENING_STATES.SPEAKING || this.state === LISTENING_STATES.PROCESSING) {
+      return true;
+    }
+
+    this.sessionGeneration++;
+    const currentGen = this.sessionGeneration;
     this.clearAllTimers();
 
     if (!this.initRecognition()) {
@@ -180,14 +248,18 @@ export class TalkingTomController {
       return false;
     }
 
-    this.attemptRecognitionStart();
+    this.attemptRecognitionStart(currentGen);
     return true;
   }
 
   /**
-   * User explicitly stops listening
+   * User explicitly stops listening (Idempotent)
    */
   stopListening() {
+    if (this.state === LISTENING_STATES.IDLE && !this.isExplicitlyEnabled) {
+      return;
+    }
+    this.sessionGeneration++;
     this.isExplicitlyEnabled = false;
     this.setOptedIn(false);
     this.wasListeningBeforeHidden = false;
@@ -205,10 +277,13 @@ export class TalkingTomController {
   }
 
   /**
-   * Temporarily pause listening (e.g. during manual action or mode switch)
+   * Temporarily pause listening (e.g. during manual action, tab switch, or AI Chat) (Idempotent)
    */
   pauseListening() {
-    if (!this.isExplicitlyEnabled) return;
+    if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.PAUSED || this.state === LISTENING_STATES.IDLE) {
+      return;
+    }
+    this.sessionGeneration++;
     this.wasListeningBeforeInterruption = true;
     this.clearAllTimers();
 
@@ -217,16 +292,20 @@ export class TalkingTomController {
         this.recognition.abort();
       } catch {}
     }
+    this.currentInterimText = '';
     this.setState(LISTENING_STATES.PAUSED);
   }
 
   /**
-   * Resume listening after an interruption if it was previously enabled
+   * Resume listening after an interruption if it was previously enabled (Idempotent)
    */
   resumeListening() {
     if (!this.isExplicitlyEnabled || !this.wasListeningBeforeInterruption) return;
     this.wasListeningBeforeInterruption = false;
-    this.attemptRecognitionStart();
+    this.sessionGeneration++;
+    const currentGen = this.sessionGeneration;
+    this.clearAllTimers();
+    this.attemptRecognitionStart(currentGen);
   }
 
   /**
@@ -255,20 +334,32 @@ export class TalkingTomController {
 
       // Safe cooldown buffer so room/speaker reflections are not re-recognized
       this.setState(LISTENING_STATES.PROCESSING, { message: 'Readying microphone...' });
+      const currentGen = this.sessionGeneration;
       this.cooldownTimer = setTimeout(() => {
+        if (currentGen !== this.sessionGeneration) return;
         if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING) {
           return;
         }
-        this.attemptRecognitionStart();
+        this.attemptRecognitionStart(currentGen);
       }, cooldownMs);
     }
   }
 
+  handleStart() {
+    if (this.isExplicitlyEnabled && this.state !== LISTENING_STATES.SPEAKING) {
+      this.setState(LISTENING_STATES.LISTENING);
+    }
+  }
+
   /**
-   * Low-level helper to trigger recognition.start() with bounded rate protection
+   * Low-level helper to trigger recognition.start() with generation tracking & bounded rate protection
    */
-  attemptRecognitionStart() {
+  attemptRecognitionStart(generation = this.sessionGeneration) {
+    if (generation !== this.sessionGeneration) return;
     if (!this.recognition || !this.isExplicitlyEnabled) return;
+    if (this.state === LISTENING_STATES.SPEAKING) {
+      return;
+    }
 
     // Enforce rate limit to avoid tight restart loops
     const now = Date.now();
@@ -278,8 +369,11 @@ export class TalkingTomController {
 
     if (this.recentRestartTimes.length >= this.options.maxRapidRestarts) {
       console.warn('TalkingTomController: Backing off recognition restart to prevent CPU loop.');
+      this.setState(LISTENING_STATES.STARTING);
       this.restartTimer = setTimeout(() => {
-        this.attemptRecognitionStart();
+        if (generation === this.sessionGeneration) {
+          this.attemptRecognitionStart(generation);
+        }
       }, 1400);
       return;
     }
@@ -290,28 +384,9 @@ export class TalkingTomController {
       this.recognition.start();
       this.setState(LISTENING_STATES.LISTENING);
     } catch (err) {
-      // If already started (InvalidStateError on some browsers), abort and retry once
+      // If recognition is already started/active (InvalidStateError), simply transition to LISTENING
       if (err.name === 'InvalidStateError') {
-        try {
-          this.recognition.abort();
-          this.restartTimer = setTimeout(() => {
-            if (this.isExplicitlyEnabled && this.state !== LISTENING_STATES.SPEAKING) {
-              try {
-                this.recognition.start();
-                this.setState(LISTENING_STATES.LISTENING);
-              } catch (retryErr) {
-                this.isExplicitlyEnabled = false;
-                this.setState(LISTENING_STATES.ERROR, {
-                  error: retryErr.name || 'start_failed',
-                  message: retryErr.message || 'Could not start microphone.'
-                });
-                if (typeof this.onError === 'function') {
-                  this.onError(retryErr.name || 'start_failed');
-                }
-              }
-            }
-          }, 150);
-        } catch {}
+        this.setState(LISTENING_STATES.LISTENING);
       } else {
         console.warn('Recognition start error:', err);
         this.isExplicitlyEnabled = false;
@@ -364,7 +439,9 @@ export class TalkingTomController {
 
       // Reset silence timer for interim speech
       if (this.silenceTimer) clearTimeout(this.silenceTimer);
+      const currentGen = this.sessionGeneration;
       this.silenceTimer = setTimeout(() => {
+        if (currentGen !== this.sessionGeneration) return;
         if (this.currentInterimText && this.state === LISTENING_STATES.LISTENING) {
           const phraseToFinalize = this.currentInterimText;
           this.currentInterimText = '';
@@ -375,7 +452,8 @@ export class TalkingTomController {
   }
 
   /**
-   * Deduplicate, validate, and emit finalized phrase for Ayush to repeat
+   * Deduplicate, validate, and emit finalized phrase for Ayush to repeat.
+   * Full Unicode support for Indian languages (Devanagari, Hindi, Hinglish, Bhojpuri, Indian English).
    */
   processFinalPhrase(phrase) {
     this.currentInterimText = '';
@@ -387,12 +465,16 @@ export class TalkingTomController {
     if (!phrase) return;
     const clean = phrase.trim();
 
-    // Ignore tiny utterances, non-alphanumeric noise, clicks, or coughs
-    if (clean.length < 2 || !/[a-zA-Z0-9]/.test(clean)) return;
+    // Support ASCII alphanumeric, Devanagari script (\u0900-\u097F), and general Unicode letters/numbers (\p{L}\p{N})
+    const hasValidSpeechChars = /[a-zA-Z0-9\u0900-\u097F]/.test(clean) || (/\p{L}|\p{N}/u).test(clean);
+    if (clean.length < 2 || !hasValidSpeechChars) return;
 
     // Filter isolated ambient noise / filler utterances that browsers commonly emit for coughs/breaths
-    const normalized = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const fillerWords = new Set(['uh', 'um', 'ah', 'eh', 'mm', 'hm', 'mhm', 'shh', 'tsk']);
+    const normalized = clean.toLowerCase().replace(/[^\p{L}\p{N}\p{M}]/gu, '');
+    const fillerWords = new Set([
+      'uh', 'um', 'ah', 'eh', 'mm', 'hm', 'mhm', 'shh', 'tsk',
+      'अह', 'उम', 'हम्म', 'हमम', 'आह'
+    ]);
     if (fillerWords.has(normalized)) return;
 
     // Deduplication: prevent repeating the exact same phrase within dedupWindowMs
@@ -433,11 +515,21 @@ export class TalkingTomController {
       return;
     }
     if (errorType === 'aborted') {
-      // We aborted it intentionally for state management (speaking/stopping)
+      // Aborted intentionally for state management (speaking/stopping/pausing)
+      return;
+    }
+
+    // Handle unsupported-language gracefully
+    if (errorType === 'language-not-supported') {
+      console.warn('SpeechRecognition: Requested language not supported by browser, falling back to hi-IN');
+      if (this.recognition) {
+        this.recognition.lang = 'hi-IN';
+      }
       return;
     }
 
     if (errorType === 'not-allowed' || errorType === 'service-not-allowed') {
+      this.sessionGeneration++;
       this.isExplicitlyEnabled = false;
       this.clearAllTimers();
       this.setState(LISTENING_STATES.ERROR, {
@@ -451,6 +543,7 @@ export class TalkingTomController {
     }
 
     if (errorType === 'audio-capture') {
+      this.sessionGeneration++;
       this.isExplicitlyEnabled = false;
       this.clearAllTimers();
       this.setState(LISTENING_STATES.ERROR, {
@@ -469,16 +562,20 @@ export class TalkingTomController {
     }
   }
 
-  handleEnd() {
-    // If the controller is in LISTENING state and user wants continuous listening,
-    // gracefully restart recognition after a brief debounce
-    if (this.isExplicitlyEnabled && this.state === LISTENING_STATES.LISTENING) {
+  handleEnd(generation = this.sessionGeneration) {
+    // If generation is stale, ignore callback completely!
+    if (generation !== this.sessionGeneration) return;
+
+    // If the controller is in LISTENING or STARTING state and user wants continuous listening,
+    // gracefully restart recognition after a brief debounce without audible alerts
+    if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING)) {
       if (this.restartTimer) clearTimeout(this.restartTimer);
       this.restartTimer = setTimeout(() => {
-        if (this.isExplicitlyEnabled && this.state === LISTENING_STATES.LISTENING) {
-          this.attemptRecognitionStart();
+        if (generation !== this.sessionGeneration) return;
+        if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING)) {
+          this.attemptRecognitionStart(generation);
         }
-      }, 180);
+      }, 200);
     }
   }
 
@@ -486,7 +583,7 @@ export class TalkingTomController {
     if (typeof document === 'undefined') return;
 
     if (document.hidden) {
-      if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.PROCESSING)) {
+      if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.PROCESSING || this.state === LISTENING_STATES.STARTING)) {
         this.wasListeningBeforeHidden = true;
         this.clearAllTimers();
         if (this.recognition) {
@@ -499,7 +596,8 @@ export class TalkingTomController {
     } else {
       if (this.isExplicitlyEnabled && this.wasListeningBeforeHidden) {
         this.wasListeningBeforeHidden = false;
-        this.attemptRecognitionStart();
+        this.sessionGeneration++;
+        this.attemptRecognitionStart(this.sessionGeneration);
       }
     }
   }
@@ -520,6 +618,7 @@ export class TalkingTomController {
   }
 
   destroy() {
+    this.sessionGeneration++;
     this.stopListening();
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.handleVisibilityChange);

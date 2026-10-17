@@ -439,5 +439,126 @@ describe('Talking Tom Continuous Listening & Audio Loop Prevention', () => {
       }
     }
   });
+
+  it('repeated start requests create only one active recognition session (idempotency)', () => {
+    const controller = new TalkingTomController();
+    assert.equal(controller.startListening(), true);
+    assert.equal(mockRecognition.startCalls, 1);
+
+    // Second start while already in LISTENING or STARTING
+    assert.equal(controller.startListening(), true);
+    assert.equal(mockRecognition.startCalls, 1, 'Subsequent start calls while active must not re-trigger recognition.start()');
+
+    controller.destroy();
+  });
+
+  it('repeated stop requests are harmless and idempotent', () => {
+    const controller = new TalkingTomController();
+    controller.startListening();
+    assert.equal(controller.state, LISTENING_STATES.LISTENING);
+
+    controller.stopListening();
+    assert.equal(controller.state, LISTENING_STATES.IDLE);
+    const aborts = mockRecognition.abortCalls;
+
+    // Second stop while IDLE
+    controller.stopListening();
+    assert.equal(controller.state, LISTENING_STATES.IDLE);
+    assert.equal(mockRecognition.abortCalls, aborts, 'Subsequent stop calls while idle must be no-ops');
+
+    controller.destroy();
+  });
+
+  it('stale onend callback from an older generation cannot stop or restart a newer session', (t, done) => {
+    const controller = new TalkingTomController();
+    controller.startListening();
+    const oldGen = controller.sessionGeneration;
+
+    // Transition to new session
+    controller.stopListening();
+    controller.startListening();
+    const newGen = controller.sessionGeneration;
+    assert.ok(newGen > oldGen);
+
+    // Fire onend with the stale generation
+    controller.handleEnd(oldGen);
+
+    // Stale onend should NOT schedule a restart on the new session
+    setTimeout(() => {
+      assert.equal(controller.state, LISTENING_STATES.LISTENING);
+      controller.destroy();
+      done();
+    }, 250);
+  });
+
+  it('InvalidStateError transitions to LISTENING without aborting and restarting in an audio loop', () => {
+    const controller = new TalkingTomController();
+    controller.initRecognition();
+    controller.isExplicitlyEnabled = true;
+
+    // Make mock recognition throw InvalidStateError on start
+    mockRecognition.start = () => {
+      const err = new Error('recognition has already started');
+      err.name = 'InvalidStateError';
+      throw err;
+    };
+
+    controller.attemptRecognitionStart();
+    assert.equal(controller.state, LISTENING_STATES.LISTENING, 'InvalidStateError must cleanly adopt LISTENING without crash or abort');
+
+    controller.destroy();
+  });
+
+  it('resolves Indian language preferences correctly to SpeechRecognition locales', () => {
+    const controller = new TalkingTomController();
+
+    assert.equal(controller.resolveRecognitionLocale('hi-IN'), 'hi-IN');
+    assert.equal(controller.resolveRecognitionLocale('en-IN'), 'en-IN');
+    assert.equal(controller.resolveRecognitionLocale('hinglish'), 'hi-IN');
+    assert.ok(
+      controller.resolveRecognitionLocale('auto') === 'hi-IN' ||
+      controller.resolveRecognitionLocale('auto') === 'en-IN'
+    );
+
+    // Setting language updates recognition.lang cleanly
+    controller.initRecognition();
+    controller.setLanguage('en-IN');
+    assert.equal(controller.options.lang, 'en-IN');
+    assert.equal(controller.recognition.lang, 'en-IN');
+
+    controller.setLanguage('hi-IN');
+    assert.equal(controller.options.lang, 'hi-IN');
+    assert.equal(controller.recognition.lang, 'hi-IN');
+
+    controller.destroy();
+  });
+
+  it('recognizes Devanagari Hindi, Hinglish, and Bhojpuri phrases without discarding them as noise', () => {
+    const controller = new TalkingTomController();
+    const processed = [];
+    controller.onPhraseFinalized = (p) => processed.push(p);
+
+    // Hindi phrase
+    controller.processFinalPhrase('नमस्ते आयुष आप कैसे हैं');
+    assert.equal(processed.length, 1);
+    assert.equal(processed[0], 'नमस्ते आयुष आप कैसे हैं');
+
+    // Hinglish phrase
+    controller.processFinalPhrase('Ayush tum bahut cute ho come here');
+    assert.equal(processed.length, 2);
+    assert.equal(processed[1], 'Ayush tum bahut cute ho come here');
+
+    // Bhojpuri phrase
+    controller.processFinalPhrase('का हाल बा आयुष');
+    assert.equal(processed.length, 3);
+    assert.equal(processed[2], 'का हाल बा आयुष');
+
+    // Hindi filler noise must be filtered out
+    controller.processFinalPhrase('हम्म');
+    controller.processFinalPhrase('अह');
+    assert.equal(processed.length, 3, 'Devanagari breath tokens/fillers must be filtered');
+
+    controller.destroy();
+  });
 });
 

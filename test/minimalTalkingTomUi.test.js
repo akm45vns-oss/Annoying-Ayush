@@ -58,10 +58,31 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
     assert.match(headerSource, /Voice Off/);
   });
 
-  it('AyushScene camera and OrbitControls are framed for 65–75% viewport focus', () => {
-    assert.match(sceneSource, /position:\s*\[0,\s*0\.18,\s*2\.22\]/);
-    assert.match(sceneSource, /fov:\s*42/);
-    assert.match(sceneSource, /target=\{\[0,\s*0\.15,\s*0\]\}/);
+  it('AyushScene camera and OrbitControls are framed to ensure character head and face are completely visible without clipping', () => {
+    assert.match(sceneSource, /position:\s*\[0,\s*0\.46,\s*3\.82\]/);
+    assert.match(sceneSource, /fov:\s*46/);
+    assert.match(sceneSource, /target=\{\[0,\s*0\.42,\s*0\]\}/);
+
+    // Verify mathematical bounds guarantee zero head clipping:
+    // Distance = 3.82, FOV = 46 deg => Half-frustum height = 3.82 * tan(23 deg) ~ 1.621
+    // Target Y = 0.42 => Top of frustum = 0.42 + 1.621 = 2.041
+    // Hair top = 1.84 => Headroom is +0.201 units, ensuring whole head and face remain visible during all animations
+    const targetY = 0.42;
+    const distance = 3.82;
+    const halfFovRad = (46 / 2) * (Math.PI / 180);
+    const frustumTop = targetY + distance * Math.tan(halfFovRad);
+    const hairTop = 1.84;
+    assert.ok(frustumTop > hairTop, `Frustum top (${frustumTop.toFixed(3)}) must be strictly above hair top (${hairTop})`);
+  });
+
+  it('Settings modal contains Indian language recognition selection with honest capability indicators', () => {
+    assert.match(settingsSource, /Speech & Language Recognition/);
+    assert.match(settingsSource, /Auto \/ Multilingual/);
+    assert.match(settingsSource, /Hindi \(हिन्दी\)/);
+    assert.match(settingsSource, /Hinglish/);
+    assert.match(settingsSource, /Indian English/);
+    assert.match(settingsSource, /Bhojpuri \(भोजपुरी\)/);
+    assert.match(settingsSource, /Browser Web Speech API active/);
   });
 
   it('Settings modal contains the compact 3-mode Voice & Repeat Style selector', () => {

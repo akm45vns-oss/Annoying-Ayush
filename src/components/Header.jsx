@@ -71,7 +71,6 @@ export default function Header({
                 type="button"
                 className={`header-mic-pill ${isListening ? 'active' : ''}`} 
                 onClick={() => {
-                  soundManager.playPop();
                   if (onToggleListening) onToggleListening();
                 }}
                 title={isListening ? "Listening hands-free. Tap to pause." : "Voice repeat paused. Tap to enable."}

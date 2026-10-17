@@ -283,6 +283,23 @@ class ClonedVoiceEngine {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(this.lastGeneratedText);
 
+      // Support Devanagari Hindi / Bhojpuri and Indian English locales
+      const hasDevanagari = /[\u0900-\u097F]/.test(this.lastGeneratedText);
+      utterance.lang = hasDevanagari ? 'hi-IN' : 'en-IN';
+
+      if (window.speechSynthesis.getVoices) {
+        try {
+          const voices = window.speechSynthesis.getVoices();
+          if (hasDevanagari) {
+            const hiVoice = voices.find((v) => v.lang && (v.lang.startsWith('hi') || v.lang.toLowerCase().includes('hi-in')));
+            if (hiVoice) utterance.voice = hiVoice;
+          } else {
+            const inVoice = voices.find((v) => v.lang && (v.lang === 'en-IN' || v.lang.toLowerCase().includes('en-in')));
+            if (inVoice) utterance.voice = inVoice;
+          }
+        } catch {}
+      }
+
       if (mode === 'funny') {
         utterance.pitch = 1.6;
         utterance.rate = 1.35;
@@ -353,6 +370,23 @@ class ClonedVoiceEngine {
     try {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
+
+      // Support Devanagari Hindi / Bhojpuri and Indian English locales
+      const hasDevanagari = /[\u0900-\u097F]/.test(text);
+      utterance.lang = hasDevanagari ? 'hi-IN' : 'en-IN';
+
+      if (window.speechSynthesis.getVoices) {
+        try {
+          const voices = window.speechSynthesis.getVoices();
+          if (hasDevanagari) {
+            const hiVoice = voices.find((v) => v.lang && (v.lang.startsWith('hi') || v.lang.toLowerCase().includes('hi-in')));
+            if (hiVoice) utterance.voice = hiVoice;
+          } else {
+            const inVoice = voices.find((v) => v.lang && (v.lang === 'en-IN' || v.lang.toLowerCase().includes('en-in')));
+            if (inVoice) utterance.voice = inVoice;
+          }
+        } catch {}
+      }
 
       if (mode === 'funny') {
         utterance.pitch = 1.6;

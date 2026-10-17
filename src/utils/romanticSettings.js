@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   floatingEffectsEnabled: true,
   customModelUrl: '',
   voiceMode: 'funny',
+  recognitionLanguage: 'auto',
 };
 
 export const DEFAULT_UNLOCKS = {
@@ -112,6 +113,7 @@ export function loadRomanticSettings() {
       floatingEffectsEnabled: typeof parsed.floatingEffectsEnabled === 'boolean' ? parsed.floatingEffectsEnabled : DEFAULT_SETTINGS.floatingEffectsEnabled,
       customModelUrl: sanitizedModelUrl,
       voiceMode: ['funny', 'device', 'cloned'].includes(parsed.voiceMode) ? parsed.voiceMode : DEFAULT_SETTINGS.voiceMode,
+      recognitionLanguage: ['auto', 'hi-IN', 'en-IN', 'hinglish', 'bho-IN'].includes(parsed.recognitionLanguage) ? parsed.recognitionLanguage : DEFAULT_SETTINGS.recognitionLanguage,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

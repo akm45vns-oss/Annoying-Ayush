@@ -10,7 +10,8 @@ import {
   MessageCircleHeart, 
   RotateCcw,
   Check,
-  Mic
+  Mic,
+  Globe
 } from 'lucide-react';
 import { DEFAULT_SETTINGS, calculateDaysTogether } from '../utils/romanticSettings';
 import { soundManager } from '../utils/audioEffects';
@@ -218,7 +219,95 @@ export default function RomanticSettingsModal({
             </label>
           </section>
 
-          {/* 3. Voice & Repeat Style */}
+          {/* 3. Speech & Language Recognition */}
+          <section className="settings-section">
+            <h3 className="section-label">
+              <Globe size={14} className="label-icon text-purple" />
+              <span>Speech & Language Recognition</span>
+            </h3>
+            <p className="settings-hint-text">Choose your spoken language for hands-free listening:</p>
+            <div className="voice-style-options">
+              <button
+                type="button"
+                className={`voice-style-btn ${(formData.recognitionLanguage || 'auto') === 'auto' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('recognitionLanguage', 'auto');
+                }}
+              >
+                <span className="voice-style-emoji">🌐</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Auto / Multilingual</span>
+                  <span className="voice-style-desc">Adapts dynamically to Hindi & Indian English</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.recognitionLanguage === 'hi-IN' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('recognitionLanguage', 'hi-IN');
+                }}
+              >
+                <span className="voice-style-emoji">🇮🇳</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Hindi (हिन्दी)</span>
+                  <span className="voice-style-desc">Native Devanagari recognition (hi-IN)</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.recognitionLanguage === 'hinglish' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('recognitionLanguage', 'hinglish');
+                }}
+              >
+                <span className="voice-style-emoji">✨</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Hinglish</span>
+                  <span className="voice-style-desc">Bilingual mixed Hindi & English code-switching</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.recognitionLanguage === 'en-IN' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('recognitionLanguage', 'en-IN');
+                }}
+              >
+                <span className="voice-style-emoji">🗣️</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Indian English</span>
+                  <span className="voice-style-desc">Optimized for Indian accents & idioms (en-IN)</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className={`voice-style-btn ${formData.recognitionLanguage === 'bho-IN' ? 'active' : ''}`}
+                onClick={() => {
+                  soundManager.playPop();
+                  handleChange('recognitionLanguage', 'bho-IN');
+                }}
+              >
+                <span className="voice-style-emoji">🌾</span>
+                <div className="voice-style-text">
+                  <span className="voice-style-name">Bhojpuri (भोजपुरी)</span>
+                  <span className="voice-style-desc">Native Bhojpuri (with graceful Hindi fallback)</span>
+                </div>
+              </button>
+            </div>
+            <p className="model-path-note" style={{ marginTop: '8px' }}>
+              ⚡ <strong>Recognition Engine:</strong> Browser Web Speech API active. Hindi and Indian English are natively recognized. Bhojpuri uses native browser dialect recognition or falls back gracefully to Hindi.
+            </p>
+          </section>
+
+          {/* 4. Voice & Repeat Style */}
           <section className="settings-section">
             <h3 className="section-label">
               <Mic size={14} className="label-icon text-purple" />
