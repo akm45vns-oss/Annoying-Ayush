@@ -76,12 +76,17 @@ export default function CustomAyushModel({
       if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
         morphs.push(child);
       } else if (child.isBone) {
-        const lowerName = child.name.toLowerCase();
-        if (lowerName.includes('head')) bones.head = child;
-        else if (lowerName.includes('neck')) bones.neck = child;
-        else if (lowerName.includes('spine')) bones.spine = child;
-        else if (lowerName.includes('arm') && lowerName.includes('left')) bones.leftArm = child;
-        else if (lowerName.includes('arm') && lowerName.includes('right')) bones.rightArm = child;
+        const name = child.name;
+        if (name === 'Head') bones.head = child;
+        else if (name === 'Neck') bones.neck = child;
+        else if (name === 'Spine' || name === 'Spine1' || name === 'Spine2') bones.spine = child;
+        else if (name === 'LeftArm') bones.leftArm = child;
+        else if (name === 'RightArm') bones.rightArm = child;
+        else if (name === 'LeftForeArm') bones.leftForeArm = child;
+        else if (name === 'RightForeArm') bones.rightForeArm = child;
+        else if (name === 'LeftHand') bones.leftHand = child;
+        else if (name === 'RightHand') bones.rightHand = child;
+        else if (name === 'Hips') bones.hips = child;
       }
     });
 
@@ -235,19 +240,104 @@ export default function CustomAyushModel({
       });
     }
 
-    // 3. Procedural Bone Motion (Breathing & Head Tracking) if no full-body clips running
+    // 3. Procedural Humanoid Armature Animation (Avaturn / Mixamo)
     const bones = bonesRef.current;
-    if (bones.head) {
-      const breathe = Math.sin(t * 2.2) * 0.03;
-      const sway = Math.sin(t * 1.1) * 0.02;
+    if (bones.leftArm && bones.rightArm && (!names || names.length === 0)) {
+      let targetLeftArmZ = 1.15;
+      let targetRightArmZ = -1.15;
+      let targetLeftArmY = 0;
+      let targetRightArmY = 0;
+      let targetLeftArmX = 0;
+      let targetRightArmX = 0;
+      let targetLeftForeArmX = 0.22;
+      let targetRightForeArmX = 0.22;
+      let targetHeadRotX = 0;
+      let targetHeadRotY = 0;
+      let targetHeadRotZ = 0;
 
-      bones.head.rotation.x = THREE.MathUtils.damp(bones.head.rotation.x, breathe, 6, delta);
-      bones.head.rotation.y = THREE.MathUtils.damp(bones.head.rotation.y, sway, 6, delta);
+      // Natural idle sway & breath
+      const idleSway = Math.sin(t * 1.2) * 0.04;
+      const breathe = Math.sin(t * 2.2) * 0.035;
 
-      // If jaw bone exists without blend shapes, drive it via audio
-      if (bones.jaw) {
-        const targetJaw = (talkingVolume > 0.05 ? talkingVolume * 0.4 : 0);
-        bones.jaw.rotation.x = THREE.MathUtils.damp(bones.jaw.rotation.x, targetJaw, 14, delta);
+      targetLeftArmZ += idleSway * 0.5;
+      targetRightArmZ += idleSway * 0.5;
+      targetHeadRotX = breathe;
+      targetHeadRotY = idleSway;
+
+      if (talkingVolume > 0.05 || currentAction === 'talking') {
+        // Conversational gestures while speaking
+        const speechBeat = Math.sin(t * 12);
+        targetHeadRotX = speechBeat * 0.08 + (talkingVolume * 0.1);
+        targetHeadRotY = Math.sin(t * 4) * 0.06;
+        targetRightArmZ = -0.7 + speechBeat * 0.1;
+        targetRightArmX = 0.35;
+        targetRightForeArmX = 0.75 + speechBeat * 0.15;
+      } else if (currentAction === 'kiss') {
+        // Blowing a sweet kiss
+        targetHeadRotX = -0.12;
+        targetHeadRotY = 0;
+        targetRightArmZ = -0.55;
+        targetRightArmX = 0.5;
+        targetRightArmY = -0.3;
+        targetRightForeArmX = 1.25;
+      } else if (currentAction === 'hug') {
+        // Open arms embrace
+        targetLeftArmZ = 0.5;
+        targetRightArmZ = -0.5;
+        targetLeftArmY = 0.45;
+        targetRightArmY = -0.45;
+        targetLeftForeArmX = 0.4;
+        targetRightForeArmX = 0.4;
+      } else if (currentAction === 'laugh') {
+        // Giggling shoulder & head bounce
+        const giggle = Math.sin(t * 15) * 0.07;
+        targetHeadRotX = -0.18 + giggle;
+        targetLeftArmZ = 1.05 + giggle;
+        targetRightArmZ = -1.05 - giggle;
+      } else if (currentAction === 'blush') {
+        // Shy head duck
+        targetHeadRotX = 0.18;
+        targetHeadRotZ = 0.1;
+        targetRightArmZ = -0.85;
+        targetRightForeArmX = 0.55;
+      } else if (currentAction === 'dance') {
+        // Bouncy rhythmic dance groove
+        const danceStep = Math.sin(t * 8);
+        targetHeadRotZ = danceStep * 0.15;
+        targetLeftArmZ = 0.8 + danceStep * 0.4;
+        targetRightArmZ = -0.8 + danceStep * 0.4;
+      } else if (currentAction === 'surprised') {
+        targetHeadRotX = -0.22;
+        targetLeftArmZ = 0.85;
+        targetRightArmZ = -0.85;
+      } else if (currentAction === 'annoyed') {
+        targetHeadRotY = 0.35;
+        targetHeadRotX = -0.06;
+      }
+
+      // Smooth bone rotations
+      bones.leftArm.rotation.z = THREE.MathUtils.damp(bones.leftArm.rotation.z, targetLeftArmZ, 8, delta);
+      bones.rightArm.rotation.z = THREE.MathUtils.damp(bones.rightArm.rotation.z, targetRightArmZ, 8, delta);
+      bones.leftArm.rotation.y = THREE.MathUtils.damp(bones.leftArm.rotation.y, targetLeftArmY, 8, delta);
+      bones.rightArm.rotation.y = THREE.MathUtils.damp(bones.rightArm.rotation.y, targetRightArmY, 8, delta);
+      bones.leftArm.rotation.x = THREE.MathUtils.damp(bones.leftArm.rotation.x, targetLeftArmX, 8, delta);
+      bones.rightArm.rotation.x = THREE.MathUtils.damp(bones.rightArm.rotation.x, targetRightArmX, 8, delta);
+
+      if (bones.leftForeArm) {
+        bones.leftForeArm.rotation.x = THREE.MathUtils.damp(bones.leftForeArm.rotation.x, targetLeftForeArmX, 8, delta);
+      }
+      if (bones.rightForeArm) {
+        bones.rightForeArm.rotation.x = THREE.MathUtils.damp(bones.rightForeArm.rotation.x, targetRightForeArmX, 8, delta);
+      }
+
+      if (bones.head) {
+        bones.head.rotation.x = THREE.MathUtils.damp(bones.head.rotation.x, targetHeadRotX, 8, delta);
+        bones.head.rotation.y = THREE.MathUtils.damp(bones.head.rotation.y, targetHeadRotY, 8, delta);
+        bones.head.rotation.z = THREE.MathUtils.damp(bones.head.rotation.z, targetHeadRotZ, 8, delta);
+      }
+
+      if (bones.spine) {
+        bones.spine.rotation.x = THREE.MathUtils.damp(bones.spine.rotation.x, breathe * 0.4, 6, delta);
       }
     }
 
