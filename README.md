@@ -31,30 +31,35 @@ All AI requests are handled securely through a server-side endpoint (`/api/chat`
    ```
 2. Open `.env.local` and add your preferred provider key:
 
-   **Option A: Groq API (Recommended — Ultra-fast with free tier)**
+   **Option A: Groq Cloud (Recommended — 100% Free Tier, No Card Needed)**
    ```env
-   # Get a free key at: https://console.groq.com/keys
+   # Get a free key in 30 seconds at: https://console.groq.com/keys
    GROQ_API_KEY=gsk_your_groq_api_key_here
-   # Optional model (defaults to llama-3.3-70b-versatile):
+   # Optional model (defaults to llama-3.3-70b-versatile, or llama-3.1-8b-instant):
    # GROQ_MODEL=llama-3.3-70b-versatile
    ```
 
-   **Option B: Google Gemini API**
+   **Option B: Google Gemini API (100% Free Tier via Google AI Studio)**
    ```env
-   # Get a key at: https://aistudio.google.com/
+   # Get a free key at: https://aistudio.google.com/
    GEMINI_API_KEY=AIzaSy...your_gemini_api_key_here
    # Optional model override (defaults to gemini-1.5-flash):
    # GEMINI_MODEL=gemini-1.5-flash
    ```
 
-   **Option C: OpenAI API**
+   **Option C: OpenRouter (Free Models Available)**
    ```env
-   # Get a key at: https://platform.openai.com/
+   # Get a free key at: https://openrouter.ai/keys
+   OPENAI_API_KEY=sk-or-v1-your_openrouter_key_here
+   OPENAI_BASE_URL=https://openrouter.ai/api/v1
+   OPENAI_MODEL=meta-llama/llama-3.3-70b-instruct:free
+   ```
+
+   **Option D: OpenAI API (Paid / Pay-as-you-go)**
+   ```env
    OPENAI_API_KEY=sk-...your_openai_api_key_here
    # Optional model override (defaults to gpt-4o-mini):
    # OPENAI_MODEL=gpt-4o-mini
-   # Optional custom base URL (for OpenRouter, Groq, or proxies):
-   # OPENAI_BASE_URL=https://api.openai.com/v1
    ```
 
 3. Start the development server:
