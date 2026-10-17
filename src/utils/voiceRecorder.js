@@ -87,10 +87,10 @@ class VoiceEngine {
       });
     } catch (err) {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        throw new Error('Microphone permission was denied. Please allow microphone access in your browser settings.');
+        throw new Error('Microphone permission denied. On Android: tap the 🔒 lock icon in Chrome address bar > Permissions > Microphone > Allow, then try again.');
       }
       if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        throw new Error('No microphone found on this device.');
+        throw new Error('No microphone detected on this device. You can tap "Test Sample Voice" to test without a mic!');
       }
       throw new Error(`Microphone error: ${err.message || 'Could not start recording.'}`);
     }
@@ -312,6 +312,63 @@ class VoiceEngine {
       this.animFrameId = null;
     }
     this.isPlaying = false;
+  }
+
+  /**
+   * Generates a sweet melodic synthetic voice sample using Web Audio API
+   * Allows full testing of Funny cartoon pitch vs Original playback,
+   * lip sync, and audio volume without needing a physical microphone!
+   */
+  createSampleAudioBuffer() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return null;
+    const sampleRate = ctx.sampleRate || 44100;
+    const duration = 2.4; // 2.4 seconds
+    const frameCount = Math.floor(sampleRate * duration);
+    const buffer = ctx.createBuffer(1, frameCount, sampleRate);
+    const channel = buffer.getChannelData(0);
+
+    // Cute sing-song melody: C4(261Hz), E4(329Hz), G4(392Hz), C5(523Hz), A4(440Hz), G4(392Hz)
+    const segments = [
+      { f: 261.63, start: 0.05, end: 0.40 },
+      { f: 329.63, start: 0.42, end: 0.78 },
+      { f: 392.00, start: 0.80, end: 1.18 },
+      { f: 523.25, start: 1.20, end: 1.65 },
+      { f: 440.00, start: 1.68, end: 2.00 },
+      { f: 392.00, start: 2.02, end: 2.38 },
+    ];
+
+    for (let i = 0; i < frameCount; i++) {
+      const t = i / sampleRate;
+      let sample = 0;
+      for (const seg of segments) {
+        if (t >= seg.start && t < seg.end) {
+          const segT = t - seg.start;
+          const segDur = seg.end - seg.start;
+          const attack = Math.min(1.0, segT / 0.03);
+          const release = Math.max(0.0, 1.0 - Math.pow(segT / segDur, 2));
+          const env = attack * release;
+
+          const f = seg.f;
+          const osc1 = Math.sin(2 * Math.PI * f * t) * 0.55;
+          const osc2 = Math.sin(2 * Math.PI * (f * 2) * t) * 0.28;
+          const osc3 = Math.sin(2 * Math.PI * (f * 3) * t) * 0.12;
+
+          sample = (osc1 + osc2 + osc3) * env * 0.75;
+          break;
+        }
+      }
+      channel[i] = sample;
+    }
+
+    return buffer;
+  }
+
+  loadSampleAudio() {
+    this.stopPlayback();
+    const buffer = this.createSampleAudioBuffer();
+    this.audioBuffer = buffer;
+    return this.audioBuffer;
   }
 
   hasRecording() {

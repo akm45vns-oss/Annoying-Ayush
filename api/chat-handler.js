@@ -296,7 +296,7 @@ export async function handleChatRequest(req, res) {
     return;
   }
 
-  const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'client';
+  const clientIp = req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || 'client';
   if (!checkRateLimit(String(clientIp))) {
     res.statusCode = 429;
     res.end(JSON.stringify({ 

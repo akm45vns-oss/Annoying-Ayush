@@ -119,6 +119,33 @@ export default function VoicePanel({
     }
   };
 
+  const handlePlaySampleVoice = () => {
+    try {
+      voiceEngine.loadSampleAudio();
+      setHasRecording(true);
+      setErrorMessage('');
+      setIsPlaying(true);
+      onPlaybackStart();
+      setStatusMessage(`Playing sample in ${voiceMode === 'funny' ? 'Funny Chipmunk 🐿️' : 'Original 🎙️'} voice...`);
+
+      voiceEngine.playRecording(
+        voiceMode,
+        (vol) => {
+          onAmplitude(vol);
+        },
+        () => {
+          setIsPlaying(false);
+          onPlaybackEnd();
+          setStatusMessage('Tap Play Again or record with mic!');
+        }
+      );
+    } catch (err) {
+      setIsPlaying(false);
+      onPlaybackEnd();
+      setErrorMessage(err?.message || 'Could not play sample audio.');
+    }
+  };
+
   const stopRecordingAction = async () => {
     if (!voiceEngine.isRecording) return;
     stopTimer();
@@ -285,6 +312,19 @@ export default function VoicePanel({
                 <span>Play Again</span>
               </>
             )}
+          </button>
+        )}
+
+        {/* Sample Voice Button: Allows testing chipmunk & original pitch without a mic */}
+        {!isRecording && (
+          <button
+            type="button"
+            className="sample-voice-btn"
+            onClick={handlePlaySampleVoice}
+            title="Test Funny vs Original voice without a microphone"
+          >
+            <Sparkles size={14} />
+            <span>{hasRecording ? 'Sample Voice' : 'No mic? Try Sample Voice 🎵'}</span>
           </button>
         )}
       </div>
