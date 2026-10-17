@@ -4,6 +4,7 @@ import AyushScene from './components/AyushScene';
 import SpeechBubble from './components/SpeechBubble';
 import InteractionMenu from './components/InteractionMenu';
 import { soundManager } from './utils/audioEffects';
+import { voiceEngine } from './utils/voiceRecorder';
 
 // Curated Dialogue Pools
 const GREETING_DIALOGUES = [
@@ -92,6 +93,11 @@ export default function App() {
   const [heartBurst, setHeartBurst] = useState(0);
   const [annoyanceCount, setAnnoyanceCount] = useState(0);
 
+  // Milestone 3: Voice repeat state
+  const [activeTab, setActiveTab] = useState('play'); // 'play' | 'voice'
+  const [voiceMode, setVoiceMode] = useState('funny'); // 'funny' | 'original'
+  const [talkingVolume, setTalkingVolume] = useState(0);
+
   const actionTimeoutRef = useRef(null);
   const speechTimeoutRef = useRef(null);
   const tapCounterRef = useRef(0);
@@ -119,12 +125,37 @@ export default function App() {
     }, durationMs);
   }, []);
 
+  // Voice playback lifecycle events
+  const handlePlaybackStart = useCallback(() => {
+    if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
+    setCurrentAction('talking');
+  }, []);
+
+  const handlePlaybackEnd = useCallback(() => {
+    setCurrentAction('idle');
+    setTalkingVolume(0);
+  }, []);
+
+  const handleAmplitude = useCallback((vol) => {
+    setTalkingVolume(vol);
+  }, []);
+
+  // Stop active voice playback if interrupting with another tap or action
+  const interruptVoiceIfPlaying = useCallback(() => {
+    if (voiceEngine.isPlaying) {
+      voiceEngine.stopPlayback();
+      setTalkingVolume(0);
+    }
+  }, []);
+
   // Reset character and state cleanly
   const resetToIdle = useCallback(() => {
     if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
     if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
     if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
 
+    voiceEngine.cleanup();
+    setTalkingVolume(0);
     tapCounterRef.current = 0;
     setAnnoyanceCount(0);
     setCurrentAction('idle');
@@ -148,6 +179,7 @@ export default function App() {
       // Trigger Annoyed reaction
       tapCounterRef.current = 0;
       setAnnoyanceCount(0);
+      interruptVoiceIfPlaying();
       soundManager.playAnnoyedPout();
       setCurrentAction('annoyed');
       const quote = ANNOYED_DIALOGUES[Math.floor(Math.random() * ANNOYED_DIALOGUES.length)];
@@ -156,10 +188,11 @@ export default function App() {
       return true;
     }
     return false;
-  }, [scheduleReturnToIdle, showSpeech]);
+  }, [interruptVoiceIfPlaying, scheduleReturnToIdle, showSpeech]);
 
   // Main Action trigger (buttons)
   const triggerAction = useCallback((actionId) => {
+    interruptVoiceIfPlaying();
     if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
     setCurrentAction(actionId);
 
@@ -186,10 +219,11 @@ export default function App() {
       showSpeech(quote, 3600);
       scheduleReturnToIdle(3600);
     }
-  }, [scheduleReturnToIdle, showSpeech]);
+  }, [interruptVoiceIfPlaying, scheduleReturnToIdle, showSpeech]);
 
   // Direct 3D Character Tap handling
   const handleCharacterTap = useCallback((part) => {
+    interruptVoiceIfPlaying();
     if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
 
     if (part === 'longpress') {
@@ -233,7 +267,7 @@ export default function App() {
       showSpeech(quote, 2500);
       scheduleReturnToIdle(2500);
     }
-  }, [handleAnnoyanceTap, scheduleReturnToIdle, showSpeech]);
+  }, [handleAnnoyanceTap, interruptVoiceIfPlaying, scheduleReturnToIdle, showSpeech]);
 
   // Bubble click cycles to next line
   const handleBubbleClick = useCallback(() => {
@@ -255,12 +289,13 @@ export default function App() {
     }
   }, []);
 
-  // Clean up all active timers on unmount
+  // Clean up all active timers and audio on unmount
   useEffect(() => {
     return () => {
       if (actionTimeoutRef.current) clearTimeout(actionTimeoutRef.current);
       if (speechTimeoutRef.current) clearTimeout(speechTimeoutRef.current);
       if (tapResetTimerRef.current) clearTimeout(tapResetTimerRef.current);
+      voiceEngine.cleanup();
     };
   }, []);
 
@@ -287,6 +322,7 @@ export default function App() {
             isHovered={isHovered}
             setIsHovered={setIsHovered}
             heartBurst={heartBurst}
+            talkingVolume={talkingVolume}
           />
         </div>
 
@@ -297,6 +333,13 @@ export default function App() {
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
           annoyanceCount={annoyanceCount}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          voiceMode={voiceMode}
+          setVoiceMode={setVoiceMode}
+          onPlaybackStart={handlePlaybackStart}
+          onPlaybackEnd={handlePlaybackEnd}
+          onAmplitude={handleAmplitude}
         />
       </main>
     </div>

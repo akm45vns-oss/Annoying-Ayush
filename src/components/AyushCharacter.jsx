@@ -10,7 +10,8 @@ export default function AyushCharacter({
   currentAction = 'idle', 
   onTapPart = () => {},
   isHovered = false,
-  setIsHovered = () => {}
+  setIsHovered = () => {},
+  talkingVolume = 0
 }) {
   const groupRef = useRef();
   const headRef = useRef();
@@ -173,7 +174,13 @@ export default function AyushCharacter({
     let targetMouthScaleZ = 1.0;
     let targetBlushOpacity = 0.65;
 
-    if (currentAction === 'surprised') {
+    // Real-time audio lip synchronization from talking voice
+    if (talkingVolume > 0.05) {
+      targetMouthScaleY = 1.0 + talkingVolume * 2.2;
+      targetMouthScaleX = 1.0 + talkingVolume * 0.4;
+      targetMouthScaleZ = 1.0 + talkingVolume * 0.8;
+      targetEyebrowY = 0.22 + talkingVolume * 0.04;
+    } else if (currentAction === 'surprised') {
       targetEyebrowY = 0.24;
       targetEyebrowRot = 0.22;
       targetMouthScaleX = 0.8;
@@ -231,6 +238,14 @@ export default function AyushCharacter({
     let targetLeftArmRotZ = 0.2 + Math.cos(t * 2) * 0.03;
     let targetRightArmRotX = -Math.sin(t * 1.8) * 0.06;
     let targetRightArmRotZ = -0.2 - Math.cos(t * 2) * 0.03;
+
+    // Expressive head gesture while talking
+    if (talkingVolume > 0.05) {
+      targetHeadRotX += Math.sin(t * 12) * talkingVolume * 0.07;
+      targetHeadRotZ += Math.cos(t * 8) * talkingVolume * 0.04;
+      targetLeftArmRotZ += talkingVolume * 0.12;
+      targetRightArmRotZ -= talkingVolume * 0.12;
+    }
 
     let targetGroupZ = 0;
 

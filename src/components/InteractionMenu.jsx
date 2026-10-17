@@ -8,9 +8,11 @@ import {
   Music,
   Mail,
   Sparkles,
-  Flame
+  Flame,
+  Mic
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
+import VoicePanel from './VoicePanel';
 
 export default function InteractionMenu({
   onTriggerAction,
@@ -18,7 +20,14 @@ export default function InteractionMenu({
   currentAction,
   isMuted,
   onToggleMute,
-  annoyanceCount = 0
+  annoyanceCount = 0,
+  activeTab = 'play',
+  setActiveTab = () => {},
+  voiceMode,
+  setVoiceMode,
+  onPlaybackStart,
+  onPlaybackEnd,
+  onAmplitude
 }) {
   const actions = [
     {
@@ -72,14 +81,43 @@ export default function InteractionMenu({
     if (currentAction === 'hug') return '🧸 Cuddling!';
     if (currentAction === 'surprised') return '😲 Surprised!';
     if (currentAction === 'boop') return '👃 Booped!';
+    if (currentAction === 'talking') return '🎙️ Repeating!';
     return '✨ Ready for love';
   };
 
   return (
     <div className="interaction-menu-container">
-      {/* Secondary Controls Bar */}
+      {/* 1. Category Switcher Tabs: Play Actions vs Voice Repeat */}
+      <div className="menu-nav-tabs">
+        <button
+          type="button"
+          className={`nav-tab-btn ${activeTab === 'play' ? 'active' : ''}`}
+          onClick={() => {
+            soundManager.playPop();
+            setActiveTab('play');
+          }}
+        >
+          <Sparkles size={14} />
+          <span>Play & Tease</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-tab-btn ${activeTab === 'voice' ? 'active' : ''}`}
+          onClick={() => {
+            soundManager.playPop();
+            setActiveTab('voice');
+          }}
+        >
+          <Mic size={14} />
+          <span>Voice & Repeat 🎙️</span>
+        </button>
+      </div>
+
+      {/* 2. Secondary Meta Controls Bar */}
       <div className="menu-meta-bar">
         <button 
+          type="button"
           className={`meta-button ${!isMuted ? 'sound-active' : ''}`}
           onClick={onToggleMute}
           title={isMuted ? "Unmute sounds" : "Mute sounds"}
@@ -94,6 +132,7 @@ export default function InteractionMenu({
         </span>
 
         <button 
+          type="button"
           className="meta-button reset-btn"
           onClick={() => {
             soundManager.playPop();
@@ -106,32 +145,44 @@ export default function InteractionMenu({
         </button>
       </div>
 
-      {/* Main Action Buttons Grid */}
-      <div className="action-buttons-grid action-buttons-5">
-        {actions.map((act) => {
-          const Icon = act.icon;
-          const isActive = currentAction === act.id;
-          return (
-            <button
-              key={act.id}
-              className={`action-btn ${isActive ? 'active' : ''}`}
-              style={{ '--btn-accent': act.color }}
-              onClick={() => {
-                act.sound();
-                onTriggerAction(act.id);
-              }}
-            >
-              <div className="btn-icon-wrapper">
-                <Icon size={20} className="btn-icon" />
-              </div>
-              <div className="btn-label-group">
-                <span className="btn-label">{act.label}</span>
-                <span className="btn-sublabel">{act.sublabel}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {/* 3. Panel Content based on Active Tab */}
+      {activeTab === 'play' ? (
+        <div className="action-buttons-grid action-buttons-5">
+          {actions.map((act) => {
+            const Icon = act.icon;
+            const isActive = currentAction === act.id;
+            return (
+              <button
+                key={act.id}
+                type="button"
+                className={`action-btn ${isActive ? 'active' : ''}`}
+                style={{ '--btn-accent': act.color }}
+                onClick={() => {
+                  act.sound();
+                  onTriggerAction(act.id);
+                }}
+              >
+                <div className="btn-icon-wrapper">
+                  <Icon size={20} className="btn-icon" />
+                </div>
+                <div className="btn-label-group">
+                  <span className="btn-label">{act.label}</span>
+                  <span className="btn-sublabel">{act.sublabel}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <VoicePanel
+          voiceMode={voiceMode}
+          setVoiceMode={setVoiceMode}
+          onPlaybackStart={onPlaybackStart}
+          onPlaybackEnd={onPlaybackEnd}
+          onAmplitude={onAmplitude}
+          isMuted={isMuted}
+        />
+      )}
     </div>
   );
 }

@@ -83,7 +83,8 @@ export default function AyushScene({
   onTapPart,
   isHovered,
   setIsHovered,
-  heartBurst = 0
+  heartBurst = 0,
+  talkingVolume = 0
 }) {
   return (
     <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
@@ -123,6 +124,7 @@ export default function AyushScene({
           onTapPart={onTapPart}
           isHovered={isHovered}
           setIsHovered={setIsHovered}
+          talkingVolume={talkingVolume}
         />
 
         {/* Constrained Camera Orbit Controls centered on character midpoint */}
