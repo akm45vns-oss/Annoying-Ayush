@@ -63,6 +63,32 @@ export default function ChatPanel({
     saveChatHistory(messages);
   }, [messages]);
 
+  // Probe API readiness on mount so status badge transitions from 'checking' to actual live/offline status
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/chat', { method: 'GET', signal: AbortSignal.timeout(4000) })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!isMounted) return;
+        if (data && data.configured) {
+          setApiStatus('live');
+          if (data.provider) setActiveProvider(data.provider);
+        } else {
+          setApiStatus('offline');
+          setActiveProvider('offline');
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setApiStatus('offline');
+          setActiveProvider('offline');
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Quick emoji buttons for fast sweet messages
   const quickEmojis = ['❤️', '😘', '🥺', '😂', '🧸', '🌸'];
 

@@ -56,6 +56,14 @@ export default function AyushCharacter({
     }
   }, [currentAction]);
 
+  useEffect(() => {
+    return () => {
+      if (pointerDownTimerRef.current) {
+        clearTimeout(pointerDownTimerRef.current);
+      }
+    };
+  }, []);
+
   // Pointer event handlers with long press detection
   const handlePointerDown = (e, part) => {
     e.stopPropagation();

@@ -314,7 +314,7 @@ export default function App() {
       );
       showSpeech(quote, 2800);
       scheduleReturnToIdle(2800);
-    } else if (part === 'cheek') {
+    } else if (part === 'cheek' || part === 'cheeks') {
       soundManager.playShyChime();
       setCurrentAction('blush');
       recordComboAction('blush');

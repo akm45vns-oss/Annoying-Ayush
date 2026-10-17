@@ -159,6 +159,14 @@ export default function CustomAyushModel({
   const pointerDownTimerRef = useRef(null);
   const isLongPressRef = useRef(false);
 
+  useEffect(() => {
+    return () => {
+      if (pointerDownTimerRef.current) {
+        clearTimeout(pointerDownTimerRef.current);
+      }
+    };
+  }, []);
+
   const handlePointerDown = (e, part) => {
     e.stopPropagation();
     isLongPressRef.current = false;

@@ -276,6 +276,21 @@ export async function handleChatRequest(req, res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
   if (req.method !== 'POST') {
+    if (req.method === 'GET') {
+      const groqKey = !!process.env.GROQ_API_KEY;
+      const geminiKey = !!process.env.GEMINI_API_KEY;
+      const openaiKey = !!process.env.OPENAI_API_KEY;
+      const configured = groqKey || geminiKey || openaiKey;
+      const provider = groqKey ? 'groq' : geminiKey ? 'gemini' : openaiKey ? 'openai' : 'offline';
+      res.statusCode = 200;
+      res.end(JSON.stringify({
+        ok: true,
+        status: configured ? 'live' : 'offline',
+        configured,
+        provider
+      }));
+      return;
+    }
     res.statusCode = 405;
     res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
     return;

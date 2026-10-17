@@ -28,8 +28,18 @@ describe('TTS Deadlines & Request Coordination', () => {
       assert.ok(SERVER_TOTAL_DEADLINE_MS < 15000, 'Server deadline must be strictly less than 15s function maxDuration');
     });
 
-    it('rejects non-POST methods with 405', async () => {
+    it('handles GET status probe with 200', async () => {
       const req = { method: 'GET', headers: {} };
+      const res = new MockResponse();
+      await handleTtsRequest(req, res);
+      assert.equal(res.statusCode, 200);
+      const data = JSON.parse(res.body);
+      assert.equal(data.ok, true);
+      assert.equal(data.status, 'ready');
+    });
+
+    it('rejects unsupported methods (e.g. DELETE) with 405', async () => {
+      const req = { method: 'DELETE', headers: {} };
       const res = new MockResponse();
       await handleTtsRequest(req, res);
       assert.equal(res.statusCode, 405);

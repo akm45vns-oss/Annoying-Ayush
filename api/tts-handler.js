@@ -67,6 +67,12 @@ export async function handleTtsRequest(req, res) {
 
   if (req.method !== 'POST') {
     res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'GET') {
+      const configured = !!((process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID) || process.env.OPENAI_API_KEY);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, status: 'ready', configured }));
+      return;
+    }
     res.statusCode = 405;
     res.end(JSON.stringify({ ok: false, error: 'Method Not Allowed' }));
     return;
