@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Settings, 
@@ -24,6 +24,16 @@ export default function RomanticSettingsModal({
   const [formData, setFormData] = useState(settings);
   const [prevSettings, setPrevSettings] = useState(settings);
   const [showSavedNotification, setShowSavedNotification] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Sync internal state if settings prop changes without cascading effect renders
   if (prevSettings !== settings) {

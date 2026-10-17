@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Heart, Info, X, Settings, MessageCircle } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
@@ -14,6 +14,18 @@ export default function Header({
   const heartTapsRef = useRef(0);
   const heartResetTimerRef = useRef(null);
   const [heartBounce, setHeartBounce] = useState(false);
+
+  // Close info dialog on Escape key
+  useEffect(() => {
+    if (!showInfo) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowInfo(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showInfo]);
 
   const handleHeartClick = () => {
     soundManager.playPop();
@@ -110,17 +122,23 @@ export default function Header({
 
       {showInfo && (
         <div className="info-modal-backdrop" onClick={() => setShowInfo(false)}>
-          <div className="info-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div 
+            className="info-modal-card" 
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="info-dialog-title"
+          >
             <button 
               type="button" 
               className="modal-close-btn" 
               onClick={() => setShowInfo(false)}
-              aria-label="Close info"
+              aria-label="Close info dialog"
             >
               <X size={18} />
             </button>
-            <div className="modal-heart-icon">💖</div>
-            <h3>Hey {gfName}! 🥰</h3>
+            <div className="modal-heart-icon" aria-hidden="true">💌</div>
+            <h3 id="info-dialog-title">Hey {gfName}! 🥰</h3>
             <p>
               I made this game just for you. You can tap on me, tease me, poke me, 
               blow kisses, hug, cuddle, and blush whenever you miss me!

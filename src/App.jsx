@@ -417,9 +417,6 @@ export default function App() {
 
   return (
     <div className="game-app-wrapper">
-      <div className="bg-glow-orb orb-1" />
-      <div className="bg-glow-orb orb-2" />
-
       <main className="game-container">
         <Header 
           onOpenSettings={() => setIsSettingsOpen(true)}

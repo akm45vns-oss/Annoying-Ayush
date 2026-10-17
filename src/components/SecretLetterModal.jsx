@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Heart, Sparkles, RotateCcw } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 import { calculateDaysTogether } from '../utils/romanticSettings';
@@ -12,6 +12,16 @@ export default function SecretLetterModal({
   unlockReason = 'secretHeart', // 'secretHeart' | 'combo'
   onResetUnlocks
 }) {
+  // Close letter on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const daysTogether = calculateDaysTogether(anniversaryDate);
