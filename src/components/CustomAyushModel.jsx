@@ -95,6 +95,18 @@ export default function CustomAyushModel({
     clone.position.z = -center.z;
     clone.position.y = -0.88 - bottomY;
 
+    // Immediately apply natural relaxed arm pose to cloned hierarchy so first frame is already resting
+    const la = clone.getObjectByName('LeftArm');
+    const ra = clone.getObjectByName('RightArm');
+    const lf = clone.getObjectByName('LeftForeArm');
+    const rf = clone.getObjectByName('RightForeArm');
+    const hd = clone.getObjectByName('Head');
+    if (la) la.rotation.set(1.30, 0.15, -0.05);
+    if (ra) ra.rotation.set(1.30, -0.15, 0.05);
+    if (lf) lf.rotation.set(0.35, 0, 0);
+    if (rf) rf.rotation.set(0.35, 0, 0);
+    if (hd) hd.rotation.set(0.03, 0.02, 0.02);
+
     return clone;
   }, [scene]);
 
@@ -125,13 +137,13 @@ export default function CustomAyushModel({
       }
     });
 
-    // Establish known natural resting pose immediately on load (arms hanging beside torso, relaxed elbows and shoulders)
-    if (bones.leftShoulder) bones.leftShoulder.rotation.set(0, 0, 0);
-    if (bones.rightShoulder) bones.rightShoulder.rotation.set(0, 0, 0);
-    if (bones.leftArm) bones.leftArm.rotation.set(1.32, 0, 0.05);
-    if (bones.rightArm) bones.rightArm.rotation.set(1.32, 0, -0.05);
-    if (bones.leftForeArm) bones.leftForeArm.rotation.set(0.25, 0, 0);
-    if (bones.rightForeArm) bones.rightForeArm.rotation.set(0.25, 0, 0);
+    // Establish known natural resting pose immediately on load (arms hanging beside torso, relaxed elbows, natural head tilt)
+    // Note: Do NOT touch LeftShoulder or RightShoulder! Their bind quaternions provide the correct clavicle orientation.
+    if (bones.leftArm) bones.leftArm.rotation.set(1.30, 0.15, -0.05);
+    if (bones.rightArm) bones.rightArm.rotation.set(1.30, -0.15, 0.05);
+    if (bones.leftForeArm) bones.leftForeArm.rotation.set(0.35, 0, 0);
+    if (bones.rightForeArm) bones.rightForeArm.rotation.set(0.35, 0, 0);
+    if (bones.head) bones.head.rotation.set(0.03, 0.02, 0.02);
 
     morphMeshesRef.current = morphs;
     bonesRef.current = bones;
@@ -140,20 +152,15 @@ export default function CustomAyushModel({
   // Setup animations if present
   const { actions, names } = useAnimations(animations, groupRef);
 
-  // Play animation clips: only play true standing idle clip if bundled;
-  // otherwise stop walking/running clips during idle so the character stands naturally!
+  // Play animation clips: only play energetic clip during dance;
+  // stop and reset all clips during idle and romantic interactions so the character stands naturally!
   useEffect(() => {
     if (!actions || names.length === 0) return;
 
-    // Detect true idle clip if bundled (e.g. idle, stand, breath, waiting)
-    const idleClipName = names.find(n => /^(idle|stand|breath|waiting)$/i.test(n) || /(idle|standing)/i.test(n));
-    // Detect energetic or walking clip for game events (dance, walk)
-    const walkClipName = names.find(n => /walk|talk/i.test(n)) || names[0];
-
     if (currentAction === 'dance') {
-      const activeClip = actions[walkClipName] || (idleClipName ? actions[idleClipName] : null);
+      const activeClip = actions['WalkAndTalk'] || actions[names[0]];
       if (activeClip) {
-        activeClip.setEffectiveTimeScale(1.4);
+        activeClip.setEffectiveTimeScale(1.3);
         activeClip.reset().fadeIn(0.25).play();
       }
       return () => {
@@ -161,31 +168,13 @@ export default function CustomAyushModel({
       };
     }
 
-    if (currentAction === 'idle') {
-      // If a dedicated idle clip exists, play it gently
-      if (idleClipName && actions[idleClipName]) {
-        const idleAction = actions[idleClipName];
-        idleAction.setEffectiveTimeScale(1.0);
-        idleAction.reset().fadeIn(0.3).play();
-        return () => {
-          idleAction.fadeOut(0.3);
-        };
-      } else {
-        // If no idle clip exists (e.g. only WalkAndTalk is bundled), stop all clips immediately so character stands naturally!
-        Object.values(actions).forEach(act => {
-          if (act) {
-            act.stop();
-          }
-        });
+    // Stop and reset all animation clips immediately so WalkAndTalk never bleeds into idle or romantic actions
+    Object.values(actions).forEach(act => {
+      if (act) {
+        act.stop();
+        act.reset();
       }
-    } else {
-      // For other interactions (kiss, hug, laugh, etc.), stop any background walking clip
-      Object.values(actions).forEach(act => {
-        if (act && act.isRunning()) {
-          act.stop();
-        }
-      });
-    }
+    });
   }, [currentAction, actions, names]);
 
   // Long press timer tracking for tap vs hug
@@ -308,37 +297,38 @@ export default function CustomAyushModel({
     const isClipRunning = actions && Object.values(actions).some(act => act && act.isRunning());
 
     // Head nods & emotional tilt (always active, as WalkAndTalk has no head track)
+    // Warm, romantic head posture & tilt (subtle and affectionate, not exaggerated)
     if (bones.head) {
-      let targetHeadRotX = 0;
-      let targetHeadRotY = 0;
-      let targetHeadRotZ = 0;
+      const idleHeadSway = Math.sin(t * 1.5) * 0.015;
+      const breatheHead = Math.sin(t * 2.2) * 0.012;
 
-      const idleHeadSway = Math.sin(t * 1.5) * 0.03;
-      const breatheHead = Math.sin(t * 2.2) * 0.025;
-
-      targetHeadRotX = breatheHead;
-      targetHeadRotY = idleHeadSway;
+      let targetHeadRotX = breatheHead + 0.03; // natural gentle forward tilt
+      let targetHeadRotY = idleHeadSway + 0.02; // warm attentive gaze
+      let targetHeadRotZ = 0.02; // sweet romantic tilt
 
       if (talkingVolume > 0.05 || currentAction === 'talking') {
         const speechBeat = Math.sin(t * 12);
-        targetHeadRotX = speechBeat * 0.08 + (talkingVolume * 0.12);
-        targetHeadRotY = Math.sin(t * 4) * 0.07;
+        targetHeadRotX = 0.03 + speechBeat * 0.04;
+        targetHeadRotY = Math.sin(t * 4) * 0.04;
       } else if (currentAction === 'kiss') {
-        targetHeadRotX = -0.12;
-      } else if (currentAction === 'laugh') {
-        const giggle = Math.sin(t * 15) * 0.08;
-        targetHeadRotX = -0.16 + giggle;
+        targetHeadRotX = -0.04;
+        targetHeadRotY = 0.03;
+      } else if (currentAction === 'hug') {
+        targetHeadRotX = 0.04;
+        targetHeadRotY = -0.02;
+        targetHeadRotZ = 0.03;
       } else if (currentAction === 'blush') {
-        targetHeadRotX = 0.18;
-        targetHeadRotZ = 0.1;
-      } else if (currentAction === 'dance') {
-        const danceStep = Math.sin(t * 8);
-        targetHeadRotZ = danceStep * 0.14;
+        targetHeadRotX = 0.09;
+        targetHeadRotY = 0.04;
+        targetHeadRotZ = 0.06;
+      } else if (currentAction === 'laugh') {
+        const giggle = Math.sin(t * 14) * 0.03;
+        targetHeadRotX = -0.06 + giggle;
       } else if (currentAction === 'surprised') {
-        targetHeadRotX = -0.22;
+        targetHeadRotX = -0.08;
       } else if (currentAction === 'annoyed') {
-        targetHeadRotY = 0.35;
-        targetHeadRotX = -0.06;
+        targetHeadRotY = 0.15;
+        targetHeadRotX = -0.03;
       }
 
       bones.head.rotation.x = THREE.MathUtils.damp(bones.head.rotation.x, targetHeadRotX, 8, delta);
@@ -348,74 +338,75 @@ export default function CustomAyushModel({
 
     // Jaw bone speech modulation
     if (bones.jaw && talkingVolume > 0.05) {
-      const extraJaw = Math.min(0.22, talkingVolume * 0.38);
+      const extraJaw = Math.min(0.18, talkingVolume * 0.32);
       bones.jaw.rotation.x = THREE.MathUtils.damp(bones.jaw.rotation.x, extraJaw, 15, delta);
     }
 
     // Procedural Arms/Body when no baked animation clip is actively playing (natural relaxed standing idle)
     if (!isClipRunning && bones.leftArm && bones.rightArm) {
-      // Baseline natural resting arm pose:
-      // Rotating X by 1.32 lowers arms from horizontal T-pose down beside hips.
-      // Rotating ForeArm X by 0.25 provides a natural subtle elbow bend.
-      // Rotating Z by +/-0.05 rests hands naturally with slight hip clearance.
-      let targetLeftArmX = 1.32;
-      let targetRightArmX = 1.32;
-      let targetLeftArmZ = 0.05;
-      let targetRightArmZ = -0.05;
-      let targetLeftArmY = 0;
-      let targetRightArmY = 0;
-      let targetLeftForeArmX = 0.25;
-      let targetRightForeArmX = 0.25;
+      // Natural resting arm pose:
+      // Rotating X by 1.30 rad lowers arms from horizontal T-pose down beside hips (hand Y = 1.006, hip Y = 0.967).
+      // Rotating ForeArm X by 0.35 rad provides a natural 20-deg elbow bend.
+      // Rotating Y by +/-0.15 angles hands naturally toward hips.
+      // Note: Clavicles (LeftShoulder/RightShoulder) stay at natural bind orientation and are never zeroed.
+      let targetLeftArmX = 1.30;
+      let targetRightArmX = 1.30;
+      let targetLeftArmY = 0.15;
+      let targetRightArmY = -0.15;
+      let targetLeftArmZ = -0.05;
+      let targetRightArmZ = 0.05;
 
-      const idleArmSway = Math.sin(t * 1.2) * 0.02;
-      const breathe = Math.sin(t * 2.2) * 0.035;
+      let targetLeftForeArmX = 0.35;
+      let targetRightForeArmX = 0.35;
 
-      targetLeftArmX += breathe * 0.15 + idleArmSway;
-      targetRightArmX += breathe * 0.15 - idleArmSway;
+      const idleArmSway = Math.sin(t * 1.2) * 0.015;
+      const breathe = Math.sin(t * 2.2) * 0.03;
+
+      targetLeftArmX += breathe * 0.12 + idleArmSway;
+      targetRightArmX += breathe * 0.12 - idleArmSway;
 
       if (talkingVolume > 0.05 || currentAction === 'talking') {
+        // Conversational gesture: gentle right arm gesture, left arm resting beside hip
         const speechBeat = Math.sin(t * 12);
-        targetRightArmX = 1.05 + speechBeat * 0.08;
-        targetRightArmZ = -0.15;
-        targetRightForeArmX = 0.55 + speechBeat * 0.12;
+        targetRightArmX = 1.05 + speechBeat * 0.06;
+        targetRightArmY = -0.15;
+        targetRightArmZ = 0.05;
+        targetRightForeArmX = 0.55 + speechBeat * 0.10;
       } else if (currentAction === 'kiss') {
-        targetRightArmX = 0.55;
-        targetRightArmZ = -0.25;
-        targetRightForeArmX = 1.20;
+        // Affectionate kiss: right hand gently rises towards chin/lips
+        targetRightArmX = 0.65;
+        targetRightArmY = -0.20;
+        targetRightArmZ = 0.15;
+        targetRightForeArmX = 1.10;
       } else if (currentAction === 'hug') {
-        targetLeftArmX = 0.55;
-        targetRightArmX = 0.55;
-        targetLeftArmZ = 0.35;
-        targetRightArmZ = -0.35;
-        targetLeftForeArmX = 0.45;
-        targetRightForeArmX = 0.45;
-      } else if (currentAction === 'laugh') {
-        const giggle = Math.sin(t * 15) * 0.04;
-        targetLeftArmX = 1.28 + giggle;
-        targetRightArmX = 1.28 + giggle;
+        // Warm embrace: both arms open and come forward gently
+        targetLeftArmX = 0.70;
+        targetRightArmX = 0.70;
+        targetLeftArmY = 0.30;
+        targetRightArmY = -0.30;
         targetLeftArmZ = 0.10;
         targetRightArmZ = -0.10;
-        targetLeftForeArmX = 0.35;
-        targetRightForeArmX = 0.35;
+        targetLeftForeArmX = 0.55;
+        targetRightForeArmX = 0.55;
       } else if (currentAction === 'blush') {
-        targetRightArmX = 0.65;
-        targetRightArmZ = -0.20;
+        // Shy romantic blush: right hand gently touches chest/heart
+        targetRightArmX = 0.85;
+        targetRightArmY = -0.15;
+        targetRightArmZ = 0.10;
         targetRightForeArmX = 0.85;
-      } else if (currentAction === 'dance') {
-        const danceStep = Math.sin(t * 8);
-        targetLeftArmX = 1.10 + danceStep * 0.3;
-        targetRightArmX = 1.10 - danceStep * 0.3;
-        targetLeftArmZ = 0.20 + danceStep * 0.15;
-        targetRightArmZ = -0.20 - danceStep * 0.15;
-        targetLeftForeArmX = 0.40;
-        targetRightForeArmX = 0.40;
+      } else if (currentAction === 'laugh') {
+        // Cheerful romantic laugh: gentle torso giggle, arms relaxed with tiny bounce
+        const giggle = Math.sin(t * 15) * 0.03;
+        targetLeftArmX = 1.28 + giggle;
+        targetRightArmX = 1.28 + giggle;
+        targetLeftForeArmX = 0.38;
+        targetRightForeArmX = 0.38;
       } else if (currentAction === 'surprised') {
+        // Playful surprise: subtle forearm raise with open posture
         targetLeftArmX = 1.10;
         targetRightArmX = 1.10;
-        targetLeftArmZ = 0.25;
-        targetRightArmZ = -0.25;
-        targetLeftForeArmX = 0.45;
-        targetRightForeArmX = 0.45;
+        targetLeftForeArmX = 0.50;
+        targetRightForeArmX = 0.50;
       }
 
       bones.leftArm.rotation.x = THREE.MathUtils.damp(bones.leftArm.rotation.x, targetLeftArmX, 8, delta);
@@ -432,18 +423,9 @@ export default function CustomAyushModel({
       if (bones.rightForeArm) {
         bones.rightForeArm.rotation.x = THREE.MathUtils.damp(bones.rightForeArm.rotation.x, targetRightForeArmX, 8, delta);
       }
-      if (bones.leftShoulder) {
-        bones.leftShoulder.rotation.x = THREE.MathUtils.damp(bones.leftShoulder.rotation.x, 0, 8, delta);
-        bones.leftShoulder.rotation.y = THREE.MathUtils.damp(bones.leftShoulder.rotation.y, 0, 8, delta);
-        bones.leftShoulder.rotation.z = THREE.MathUtils.damp(bones.leftShoulder.rotation.z, 0, 8, delta);
-      }
-      if (bones.rightShoulder) {
-        bones.rightShoulder.rotation.x = THREE.MathUtils.damp(bones.rightShoulder.rotation.x, 0, 8, delta);
-        bones.rightShoulder.rotation.y = THREE.MathUtils.damp(bones.rightShoulder.rotation.y, 0, 8, delta);
-        bones.rightShoulder.rotation.z = THREE.MathUtils.damp(bones.rightShoulder.rotation.z, 0, 8, delta);
-      }
+
       if (bones.spine) {
-        bones.spine.rotation.x = THREE.MathUtils.damp(bones.spine.rotation.x, breathe * 0.4, 6, delta);
+        bones.spine.rotation.x = THREE.MathUtils.damp(bones.spine.rotation.x, breathe * 0.3, 6, delta);
       }
     }
 

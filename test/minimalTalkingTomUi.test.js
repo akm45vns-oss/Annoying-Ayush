@@ -125,12 +125,95 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
 
   it('CustomAyushModel suppresses WalkAndTalk loops during idle and provides natural relaxed arm pose', () => {
     const modelSource = fs.readFileSync(path.resolve(process.cwd(), 'src/components/CustomAyushModel.jsx'), 'utf8');
-    assert.match(modelSource, /idleClipName/);
-    assert.match(modelSource, /targetLeftArmX = 1\.32/);
-    assert.match(modelSource, /targetRightArmX = 1\.32/);
-    assert.match(modelSource, /targetLeftForeArmX = 0\.25/);
-    assert.match(modelSource, /bones\.leftShoulder/);
-    assert.match(modelSource, /bones\.rightShoulder/);
+    // WalkAndTalk must only play during dance; must stop and reset during idle/romantic actions
+    assert.match(modelSource, /currentAction === 'dance'/);
     assert.match(modelSource, /act\.stop\(\)/);
+    assert.match(modelSource, /act\.reset\(\)/);
+
+    // Natural relaxed arm pose targets
+    assert.match(modelSource, /targetLeftArmX = 1\.30/);
+    assert.match(modelSource, /targetRightArmX = 1\.30/);
+    assert.match(modelSource, /targetLeftForeArmX = 0\.35/);
+    assert.match(modelSource, /targetRightForeArmX = 0\.35/);
+
+    // Initial frame pre-applied in useMemo on cloned scene to avoid bind pose flash
+    assert.match(modelSource, /la\.rotation\.set\(1\.30,\s*0\.15,\s*-0\.05\)/);
+    assert.match(modelSource, /ra\.rotation\.set\(1\.30,\s*-0\.15,\s*0\.05\)/);
+  });
+
+  it('Verifies 3D rig forward kinematics: arms hang naturally beside torso near hips and do not point up', async () => {
+    const THREE = await import('three');
+    const glbPath = path.resolve(process.cwd(), 'public/models/ayush.glb');
+    const buf = fs.readFileSync(glbPath);
+    const chunk0Len = buf.readUInt32LE(12);
+    const jsonStr = buf.toString('utf8', 20, 20 + chunk0Len);
+    const gltf = JSON.parse(jsonStr);
+
+    // Build bone hierarchy from GLTF nodes
+    const nodes = [];
+    gltf.nodes.forEach((n, idx) => {
+      const obj = n.children ? new THREE.Bone() : new THREE.Object3D();
+      obj.name = n.name || `node_${idx}`;
+      if (n.translation) obj.position.fromArray(n.translation);
+      if (n.rotation) obj.quaternion.fromArray(n.rotation);
+      if (n.scale) obj.scale.fromArray(n.scale);
+      nodes[idx] = obj;
+    });
+
+    gltf.nodes.forEach((n, idx) => {
+      if (n.children) {
+        n.children.forEach(cIdx => {
+          nodes[idx].add(nodes[cIdx]);
+        });
+      }
+    });
+
+    const root = nodes.find(n => n.name === 'Armature') || nodes[57];
+    const leftArm = root.getObjectByName('LeftArm');
+    const rightArm = root.getObjectByName('RightArm');
+    const leftForeArm = root.getObjectByName('LeftForeArm');
+    const rightForeArm = root.getObjectByName('RightForeArm');
+    const leftHand = root.getObjectByName('LeftHand');
+    const rightHand = root.getObjectByName('RightHand');
+    const hips = root.getObjectByName('Hips');
+
+    assert.ok(leftArm && rightArm && leftForeArm && rightForeArm && leftHand && rightHand && hips);
+
+    // Apply the exact relaxed idle pose used in CustomAyushModel
+    leftArm.rotation.set(1.30, 0.15, -0.05);
+    rightArm.rotation.set(1.30, -0.15, 0.05);
+    leftForeArm.rotation.set(0.35, 0, 0);
+    rightForeArm.rotation.set(0.35, 0, 0);
+
+    root.updateMatrixWorld(true);
+
+    const hipsY = hips.getWorldPosition(new THREE.Vector3()).y;
+    const leftArmPos = leftArm.getWorldPosition(new THREE.Vector3());
+    const rightArmPos = rightArm.getWorldPosition(new THREE.Vector3());
+    const leftElbowPos = leftForeArm.getWorldPosition(new THREE.Vector3());
+    const rightElbowPos = rightForeArm.getWorldPosition(new THREE.Vector3());
+    const leftHandPos = leftHand.getWorldPosition(new THREE.Vector3());
+    const rightHandPos = rightHand.getWorldPosition(new THREE.Vector3());
+
+    // 1. Shoulders/Arms must be higher than elbows, and elbows higher than hands (arms hang downward)
+    assert.ok(leftArmPos.y > leftElbowPos.y, `Left shoulder Y (${leftArmPos.y.toFixed(3)}) must be higher than elbow Y (${leftElbowPos.y.toFixed(3)})`);
+    assert.ok(leftElbowPos.y > leftHandPos.y, `Left elbow Y (${leftElbowPos.y.toFixed(3)}) must be higher than hand Y (${leftHandPos.y.toFixed(3)})`);
+    assert.ok(rightArmPos.y > rightElbowPos.y, `Right shoulder Y (${rightArmPos.y.toFixed(3)}) must be higher than elbow Y (${rightElbowPos.y.toFixed(3)})`);
+    assert.ok(rightElbowPos.y > rightHandPos.y, `Right elbow Y (${rightElbowPos.y.toFixed(3)}) must be higher than hand Y (${rightHandPos.y.toFixed(3)})`);
+
+    // 2. Hands must NOT be above shoulders (arms must not point vertically upward)
+    assert.ok(leftHandPos.y < leftArmPos.y - 0.4, 'Left hand must be well below shoulder (not raised up)');
+    assert.ok(rightHandPos.y < rightArmPos.y - 0.4, 'Right hand must be well below shoulder (not raised up)');
+
+    // 3. Hands must rest near hip level (within 0.15 units of hips Y)
+    const leftHandHipDelta = Math.abs(leftHandPos.y - hipsY);
+    const rightHandHipDelta = Math.abs(rightHandPos.y - hipsY);
+    assert.ok(leftHandHipDelta < 0.10, `Left hand Y (${leftHandPos.y.toFixed(3)}) must be close to hip level (${hipsY.toFixed(3)})`);
+    assert.ok(rightHandHipDelta < 0.10, `Right hand Y (${rightHandPos.y.toFixed(3)}) must be close to hip level (${hipsY.toFixed(3)})`);
+
+    // 4. Arms hang beside torso (X coordinate magnitude between 0.20 and 0.35, not stretched out to > 0.6)
+    assert.ok(Math.abs(leftHandPos.x) >= 0.20 && Math.abs(leftHandPos.x) <= 0.35, `Left hand X (${leftHandPos.x.toFixed(3)}) must hang beside torso`);
+    assert.ok(Math.abs(rightHandPos.x) >= 0.20 && Math.abs(rightHandPos.x) <= 0.35, `Right hand X (${rightHandPos.x.toFixed(3)}) must hang beside torso`);
   });
 });
+
