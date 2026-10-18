@@ -45,7 +45,7 @@ class ClonedVoiceEngine {
           if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
-          const dummy = new SpeechSynthesisUtterance('');
+          const dummy = new SpeechSynthesisUtterance(' ');
           dummy.volume = 0.01;
           window.speechSynthesis.speak(dummy);
         } catch {}
@@ -399,8 +399,13 @@ class ClonedVoiceEngine {
     }
 
     try {
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+        } catch {}
       }
 
       const utterance = new SpeechSynthesisUtterance(text);

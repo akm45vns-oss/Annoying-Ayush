@@ -59,17 +59,19 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
   });
 
   it('AyushScene camera and OrbitControls are framed to ensure character head and face are completely visible without clipping', () => {
-    assert.match(sceneSource, /position:\s*\[0,\s*0\.28,\s*3\.24\]/);
+    assert.match(sceneSource, /position:\s*\[0,\s*0\.38,\s*3\.24\]/);
     assert.match(sceneSource, /fov:\s*44/);
-    assert.match(sceneSource, /target=\{\[0,\s*0\.24,\s*0\]\}/);
+    assert.match(sceneSource, /target=\{\[0,\s*0\.38,\s*0\]\}/);
+    assert.match(sceneSource, /FaceFocusedCameraController/);
+    assert.match(sceneSource, /desiredTargetY = THREE\.MathUtils\.lerp\(0\.38,\s*0\.98,\s*zoomProgress\)/);
 
     // Verify mathematical bounds guarantee zero head clipping and prominent 75-85% framing:
     // Distance = 3.24, FOV = 44 deg => Half-frustum height = 3.24 * tan(22 deg) ~ 1.309
     // Full frustum height = 2.618 units.
     // Model height = 2.18 units => 2.18 / 2.618 = 83.3% of vertical canvas height (within 75-85% requirement)
-    // Target Y = 0.24 => Top of frustum = 0.24 + 1.309 = 1.549
-    // Hair top = 1.30 in custom model (1.40 in procedural) => Headroom is +0.15 to +0.25 units
-    const targetY = 0.24;
+    // Target Y = 0.38 => Top of frustum = 0.38 + 1.309 = 1.689
+    // Hair top = 1.30 in custom model => Headroom is +0.389 units
+    const targetY = 0.38;
     const distance = 3.24;
     const halfFovRad = (44 / 2) * (Math.PI / 180);
     const frustumTop = targetY + distance * Math.tan(halfFovRad);
@@ -79,6 +81,15 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
     const frustumHeight = 2 * distance * Math.tan(halfFovRad);
     const framingRatio = 2.18 / frustumHeight;
     assert.ok(framingRatio >= 0.75 && framingRatio <= 0.85, `Framing ratio (${(framingRatio * 100).toFixed(1)}%) must be between 75% and 85%`);
+
+    // Verify close-up face focus at distance = 1.5:
+    const closeDistance = 1.5;
+    const faceTargetY = 0.98;
+    const closeFrustumTop = faceTargetY + closeDistance * Math.tan(halfFovRad);
+    const closeFrustumBottom = faceTargetY - closeDistance * Math.tan(halfFovRad);
+    // Character face is centered around 0.98 (jaw ~0.90, eyes ~1.04)
+    assert.ok(closeFrustumTop > 1.25, 'Face zoom top must cover the head and eyes');
+    assert.ok(closeFrustumBottom > 0.30, 'Face zoom bottom must exclude the stomach/belt');
   });
 
   it('Settings modal contains Indian language recognition selection with honest capability indicators', () => {
@@ -112,11 +123,14 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
     assert.match(appSource, /Tap to Talk to Ayush 🎙️/);
   });
 
-  it('CustomAyushModel suppresses WalkAndTalk loops during idle and provides natural standing pose', () => {
+  it('CustomAyushModel suppresses WalkAndTalk loops during idle and provides natural relaxed arm pose', () => {
     const modelSource = fs.readFileSync(path.resolve(process.cwd(), 'src/components/CustomAyushModel.jsx'), 'utf8');
     assert.match(modelSource, /idleClipName/);
-    assert.match(modelSource, /targetLeftArmZ = 1\.15/);
-    assert.match(modelSource, /targetRightArmZ = -1\.15/);
-    assert.match(modelSource, /act\.fadeOut\(0\.3\)/);
+    assert.match(modelSource, /targetLeftArmX = 1\.32/);
+    assert.match(modelSource, /targetRightArmX = 1\.32/);
+    assert.match(modelSource, /targetLeftForeArmX = 0\.25/);
+    assert.match(modelSource, /bones\.leftShoulder/);
+    assert.match(modelSource, /bones\.rightShoulder/);
+    assert.match(modelSource, /act\.stop\(\)/);
   });
 });

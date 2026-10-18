@@ -113,15 +113,25 @@ export default function CustomAyushModel({
         else if (name === 'Jaw' || name.toLowerCase().includes('jaw')) bones.jaw = child;
         else if (name === 'Neck' || name.toLowerCase().includes('neck')) bones.neck = child;
         else if (name.includes('Spine') || name === 'Chest' || name.toLowerCase().includes('chest')) bones.spine = child;
-        else if (name === 'LeftShoulder' || name === 'LeftArm') bones.leftArm = child;
-        else if (name === 'RightShoulder' || name === 'RightArm') bones.rightArm = child;
-        else if (name === 'LeftElbow' || name === 'LeftForeArm') bones.leftForeArm = child;
-        else if (name === 'RightElbow' || name === 'RightForeArm') bones.rightForeArm = child;
-        else if (name === 'LeftWrist' || name === 'LeftHand') bones.leftHand = child;
-        else if (name === 'RightWrist' || name === 'RightHand') bones.rightHand = child;
+        else if (name === 'LeftShoulder' || name.toLowerCase().includes('leftshoulder')) bones.leftShoulder = child;
+        else if (name === 'RightShoulder' || name.toLowerCase().includes('rightshoulder')) bones.rightShoulder = child;
+        else if (name === 'LeftArm' || name.toLowerCase().includes('leftarm')) bones.leftArm = child;
+        else if (name === 'RightArm' || name.toLowerCase().includes('rightarm')) bones.rightArm = child;
+        else if (name === 'LeftForeArm' || name === 'LeftElbow' || name.toLowerCase().includes('leftforearm')) bones.leftForeArm = child;
+        else if (name === 'RightForeArm' || name === 'RightElbow' || name.toLowerCase().includes('rightforearm')) bones.rightForeArm = child;
+        else if (name === 'LeftHand' || name === 'LeftWrist' || name.toLowerCase().includes('lefthand')) bones.leftHand = child;
+        else if (name === 'RightHand' || name === 'RightWrist' || name.toLowerCase().includes('righthand')) bones.rightHand = child;
         else if (name === 'Hips' || name.toLowerCase().includes('hips')) bones.hips = child;
       }
     });
+
+    // Establish known natural resting pose immediately on load (arms hanging beside torso, relaxed elbows and shoulders)
+    if (bones.leftShoulder) bones.leftShoulder.rotation.set(0, 0, 0);
+    if (bones.rightShoulder) bones.rightShoulder.rotation.set(0, 0, 0);
+    if (bones.leftArm) bones.leftArm.rotation.set(1.32, 0, 0.05);
+    if (bones.rightArm) bones.rightArm.rotation.set(1.32, 0, -0.05);
+    if (bones.leftForeArm) bones.leftForeArm.rotation.set(0.25, 0, 0);
+    if (bones.rightForeArm) bones.rightForeArm.rotation.set(0.25, 0, 0);
 
     morphMeshesRef.current = morphs;
     bonesRef.current = bones;
@@ -161,11 +171,10 @@ export default function CustomAyushModel({
           idleAction.fadeOut(0.3);
         };
       } else {
-        // If no idle clip exists (e.g. only WalkAndTalk is bundled), stop all walking/exercise clips!
-        // The procedural posture in useFrame maintains a natural standing pose with relaxed arms and breathing.
+        // If no idle clip exists (e.g. only WalkAndTalk is bundled), stop all clips immediately so character stands naturally!
         Object.values(actions).forEach(act => {
-          if (act && act.isRunning()) {
-            act.fadeOut(0.3);
+          if (act) {
+            act.stop();
           }
         });
       }
@@ -173,7 +182,7 @@ export default function CustomAyushModel({
       // For other interactions (kiss, hug, laugh, etc.), stop any background walking clip
       Object.values(actions).forEach(act => {
         if (act && act.isRunning()) {
-          act.fadeOut(0.2);
+          act.stop();
         }
       });
     }
@@ -343,68 +352,95 @@ export default function CustomAyushModel({
       bones.jaw.rotation.x = THREE.MathUtils.damp(bones.jaw.rotation.x, extraJaw, 15, delta);
     }
 
-    // Procedural Arms/Body when no baked animation clip is actively playing (e.g. natural standing idle)
+    // Procedural Arms/Body when no baked animation clip is actively playing (natural relaxed standing idle)
     if (!isClipRunning && bones.leftArm && bones.rightArm) {
-      let targetLeftArmZ = 1.15;
-      let targetRightArmZ = -1.15;
+      // Baseline natural resting arm pose:
+      // Rotating X by 1.32 lowers arms from horizontal T-pose down beside hips.
+      // Rotating ForeArm X by 0.25 provides a natural subtle elbow bend.
+      // Rotating Z by +/-0.05 rests hands naturally with slight hip clearance.
+      let targetLeftArmX = 1.32;
+      let targetRightArmX = 1.32;
+      let targetLeftArmZ = 0.05;
+      let targetRightArmZ = -0.05;
       let targetLeftArmY = 0;
       let targetRightArmY = 0;
-      let targetLeftArmX = 0;
-      let targetRightArmX = 0;
-      let targetLeftForeArmX = 0.22;
-      let targetRightForeArmX = 0.22;
+      let targetLeftForeArmX = 0.25;
+      let targetRightForeArmX = 0.25;
 
-      const idleSway = Math.sin(t * 1.2) * 0.04;
+      const idleArmSway = Math.sin(t * 1.2) * 0.02;
       const breathe = Math.sin(t * 2.2) * 0.035;
 
-      targetLeftArmZ += idleSway * 0.5;
-      targetRightArmZ += idleSway * 0.5;
+      targetLeftArmX += breathe * 0.15 + idleArmSway;
+      targetRightArmX += breathe * 0.15 - idleArmSway;
 
       if (talkingVolume > 0.05 || currentAction === 'talking') {
         const speechBeat = Math.sin(t * 12);
-        targetRightArmZ = -0.7 + speechBeat * 0.1;
-        targetRightArmX = 0.35;
-        targetRightForeArmX = 0.75 + speechBeat * 0.15;
+        targetRightArmX = 1.05 + speechBeat * 0.08;
+        targetRightArmZ = -0.15;
+        targetRightForeArmX = 0.55 + speechBeat * 0.12;
       } else if (currentAction === 'kiss') {
-        targetRightArmZ = -0.55;
-        targetRightArmX = 0.5;
-        targetRightArmY = -0.3;
-        targetRightForeArmX = 1.25;
+        targetRightArmX = 0.55;
+        targetRightArmZ = -0.25;
+        targetRightForeArmX = 1.20;
       } else if (currentAction === 'hug') {
-        targetLeftArmZ = 0.5;
-        targetRightArmZ = -0.5;
-        targetLeftArmY = 0.45;
-        targetRightArmY = -0.45;
-        targetLeftForeArmX = 0.4;
-        targetRightForeArmX = 0.4;
+        targetLeftArmX = 0.55;
+        targetRightArmX = 0.55;
+        targetLeftArmZ = 0.35;
+        targetRightArmZ = -0.35;
+        targetLeftForeArmX = 0.45;
+        targetRightForeArmX = 0.45;
       } else if (currentAction === 'laugh') {
-        const giggle = Math.sin(t * 15) * 0.07;
-        targetLeftArmZ = 1.05 + giggle;
-        targetRightArmZ = -1.05 - giggle;
+        const giggle = Math.sin(t * 15) * 0.04;
+        targetLeftArmX = 1.28 + giggle;
+        targetRightArmX = 1.28 + giggle;
+        targetLeftArmZ = 0.10;
+        targetRightArmZ = -0.10;
+        targetLeftForeArmX = 0.35;
+        targetRightForeArmX = 0.35;
       } else if (currentAction === 'blush') {
-        targetRightArmZ = -0.85;
-        targetRightForeArmX = 0.55;
+        targetRightArmX = 0.65;
+        targetRightArmZ = -0.20;
+        targetRightForeArmX = 0.85;
       } else if (currentAction === 'dance') {
         const danceStep = Math.sin(t * 8);
-        targetLeftArmZ = 0.8 + danceStep * 0.4;
-        targetRightArmZ = -0.8 + danceStep * 0.4;
+        targetLeftArmX = 1.10 + danceStep * 0.3;
+        targetRightArmX = 1.10 - danceStep * 0.3;
+        targetLeftArmZ = 0.20 + danceStep * 0.15;
+        targetRightArmZ = -0.20 - danceStep * 0.15;
+        targetLeftForeArmX = 0.40;
+        targetRightForeArmX = 0.40;
       } else if (currentAction === 'surprised') {
-        targetLeftArmZ = 0.85;
-        targetRightArmZ = -0.85;
+        targetLeftArmX = 1.10;
+        targetRightArmX = 1.10;
+        targetLeftArmZ = 0.25;
+        targetRightArmZ = -0.25;
+        targetLeftForeArmX = 0.45;
+        targetRightForeArmX = 0.45;
       }
 
-      bones.leftArm.rotation.z = THREE.MathUtils.damp(bones.leftArm.rotation.z, targetLeftArmZ, 8, delta);
-      bones.rightArm.rotation.z = THREE.MathUtils.damp(bones.rightArm.rotation.z, targetRightArmZ, 8, delta);
-      bones.leftArm.rotation.y = THREE.MathUtils.damp(bones.leftArm.rotation.y, targetLeftArmY, 8, delta);
-      bones.rightArm.rotation.y = THREE.MathUtils.damp(bones.rightArm.rotation.y, targetRightArmY, 8, delta);
       bones.leftArm.rotation.x = THREE.MathUtils.damp(bones.leftArm.rotation.x, targetLeftArmX, 8, delta);
+      bones.leftArm.rotation.y = THREE.MathUtils.damp(bones.leftArm.rotation.y, targetLeftArmY, 8, delta);
+      bones.leftArm.rotation.z = THREE.MathUtils.damp(bones.leftArm.rotation.z, targetLeftArmZ, 8, delta);
+
       bones.rightArm.rotation.x = THREE.MathUtils.damp(bones.rightArm.rotation.x, targetRightArmX, 8, delta);
+      bones.rightArm.rotation.y = THREE.MathUtils.damp(bones.rightArm.rotation.y, targetRightArmY, 8, delta);
+      bones.rightArm.rotation.z = THREE.MathUtils.damp(bones.rightArm.rotation.z, targetRightArmZ, 8, delta);
 
       if (bones.leftForeArm) {
         bones.leftForeArm.rotation.x = THREE.MathUtils.damp(bones.leftForeArm.rotation.x, targetLeftForeArmX, 8, delta);
       }
       if (bones.rightForeArm) {
         bones.rightForeArm.rotation.x = THREE.MathUtils.damp(bones.rightForeArm.rotation.x, targetRightForeArmX, 8, delta);
+      }
+      if (bones.leftShoulder) {
+        bones.leftShoulder.rotation.x = THREE.MathUtils.damp(bones.leftShoulder.rotation.x, 0, 8, delta);
+        bones.leftShoulder.rotation.y = THREE.MathUtils.damp(bones.leftShoulder.rotation.y, 0, 8, delta);
+        bones.leftShoulder.rotation.z = THREE.MathUtils.damp(bones.leftShoulder.rotation.z, 0, 8, delta);
+      }
+      if (bones.rightShoulder) {
+        bones.rightShoulder.rotation.x = THREE.MathUtils.damp(bones.rightShoulder.rotation.x, 0, 8, delta);
+        bones.rightShoulder.rotation.y = THREE.MathUtils.damp(bones.rightShoulder.rotation.y, 0, 8, delta);
+        bones.rightShoulder.rotation.z = THREE.MathUtils.damp(bones.rightShoulder.rotation.z, 0, 8, delta);
       }
       if (bones.spine) {
         bones.spine.rotation.x = THREE.MathUtils.damp(bones.spine.rotation.x, breathe * 0.4, 6, delta);

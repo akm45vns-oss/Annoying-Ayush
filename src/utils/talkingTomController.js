@@ -214,7 +214,9 @@ export class TalkingTomController {
 
   setState(newState, detail = {}) {
     if (this.state === newState && !detail.force) return;
+    const previousState = this.state;
     this.state = newState;
+    logVoiceDiagnostic('state_transition', { from: previousState, to: newState, ...detail });
     if (typeof this.onStateChange === 'function') {
       try {
         this.onStateChange(newState, detail);
@@ -473,11 +475,13 @@ export class TalkingTomController {
     interimStr = interimStr.trim();
 
     if (finalizedStr) {
+      logVoiceDiagnostic('recognition_result_final', { length: finalizedStr.length });
       this.processFinalPhrase(finalizedStr);
       return;
     }
 
     if (interimStr) {
+      logVoiceDiagnostic('recognition_result_interim', { length: interimStr.length });
       this.currentInterimText = interimStr;
       if (typeof this.onInterimResult === 'function') {
         this.onInterimResult(interimStr);
@@ -617,6 +621,21 @@ export class TalkingTomController {
 
     // If speaking or processing, do not restart yet; setSpeaking(false) handles return to listening cleanly after cooldown
     if (this.state === LISTENING_STATES.SPEAKING || this.state === LISTENING_STATES.PROCESSING) {
+      return;
+    }
+
+    // Android Google Speech recovery:
+    // Android Chrome often terminates speech recognition upon speech pause without emitting an isFinal result.
+    // If interim text was captured while listening, promote and finalize it immediately so the phrase is repeated!
+    if (this.currentInterimText && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING)) {
+      const phraseToFinalize = this.currentInterimText;
+      this.currentInterimText = '';
+      if (this.silenceTimer) {
+        clearTimeout(this.silenceTimer);
+        this.silenceTimer = null;
+      }
+      logVoiceDiagnostic('interim_promoted_on_end', { length: phraseToFinalize.length, lang: this.options.lang });
+      this.processFinalPhrase(phraseToFinalize);
       return;
     }
 

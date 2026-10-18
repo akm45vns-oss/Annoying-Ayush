@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
 import AyushModelManager from './AyushModelManager';
 import FloatingHearts from './FloatingHearts';
 
@@ -78,6 +79,38 @@ function StudioStage() {
   );
 }
 
+/**
+ * Dynamic Face-Focused Camera Controller
+ * 
+ * Coordinates smooth zoom transition:
+ * - At wide zoom (distance >= 3.24): Target rests at y = 0.38 for full-body framing (shoes at -0.88, head at +1.30).
+ * - When zooming in (distance down to 1.5): Target glides up to y = 0.98 (face center: eyes/nose/mouth).
+ * - Adjusts camera.position.y alongside target.y by the exact same delta, ensuring spherical angles
+ *   and distance remain invariant with OrbitControls (zero fighting, zero drift, zero jerking).
+ */
+function FaceFocusedCameraController({ controlsRef }) {
+  useFrame((state) => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    const cam = state.camera;
+    const distance = cam.position.distanceTo(controls.target);
+
+    // Zoom interpolation: 0 at wide framing (3.24), 1 at close-up (1.5)
+    const zoomProgress = THREE.MathUtils.clamp((3.24 - distance) / (3.24 - 1.5), 0, 1);
+    const desiredTargetY = THREE.MathUtils.lerp(0.38, 0.98, zoomProgress);
+
+    const diff = desiredTargetY - controls.target.y;
+    if (Math.abs(diff) > 0.0005) {
+      controls.target.y = desiredTargetY;
+      cam.position.y += diff;
+      controls.update();
+    }
+  });
+
+  return null;
+}
+
 export default function AyushScene({
   customModelUrl,
   currentAction,
@@ -88,14 +121,18 @@ export default function AyushScene({
   talkingVolume = 0,
   floatingEffectsEnabled = true
 }) {
+  const controlsRef = useRef();
+
   return (
     <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
       <Canvas
         shadows
-        // Camera positioned and focused on Ayush's vertical center (y=0.24) for prominent, unclipped full-body framing (78-83% viewport height)
-        camera={{ position: [0, 0.28, 3.24], fov: 44 }}
+        // Camera positioned for prominent full-body framing (83% viewport height) with headroom above hair
+        camera={{ position: [0, 0.38, 3.24], fov: 44 }}
         gl={{ antialias: true, alpha: true }}
       >
+        <FaceFocusedCameraController controlsRef={controlsRef} />
+
         {/* Ambient & Key Lighting */}
         <ambientLight intensity={0.9} color="#fff8f0" />
         
@@ -130,13 +167,14 @@ export default function AyushScene({
           talkingVolume={talkingVolume}
         />
 
-        {/* Constrained Camera Orbit Controls centered on character midpoint */}
+        {/* Constrained Camera Orbit Controls with face-focused zoom target */}
         <OrbitControls
-          target={[0, 0.24, 0]}
+          ref={controlsRef}
+          target={[0, 0.38, 0]}
           enablePan={false}
           enableZoom={true}
-          minDistance={2.0}
-          maxDistance={4.2}
+          minDistance={1.4}
+          maxDistance={4.0}
           minPolarAngle={Math.PI / 2.8}
           maxPolarAngle={Math.PI / 1.95}
           dampingFactor={0.06}

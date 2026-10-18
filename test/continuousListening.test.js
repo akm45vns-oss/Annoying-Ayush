@@ -630,6 +630,110 @@ describe('Talking Tom Continuous Listening & Audio Loop Prevention', () => {
       done();
     }, 60);
   });
+
+  it('promotes and emits pending interim speech when Android recognition ends on silence without isFinal flag', (t, done) => {
+    const controller = new TalkingTomController({ dedupWindowMs: 2000 });
+    let phraseReceived = null;
+
+    controller.onPhraseFinalized = (phrase) => {
+      phraseReceived = phrase;
+      assert.equal(phrase, 'Tum bahut sundar ho');
+      assert.equal(controller.state, LISTENING_STATES.PROCESSING);
+      controller.destroy();
+      done();
+    };
+
+    controller.startListening();
+
+    // Android Chrome sends only interim result
+    controller.handleResult({
+      resultIndex: 0,
+      results: [
+        Object.assign([{ transcript: 'Tum bahut sundar ho' }], { isFinal: false })
+      ]
+    });
+
+    assert.equal(controller.currentInterimText, 'Tum bahut sundar ho');
+
+    // Android Google Speech ends on silence
+    controller.handleEnd();
+
+    assert.equal(phraseReceived, 'Tum bahut sundar ho');
+  });
+
+  it('supports continuous hands-free multi-phrase repetitions without screen interaction', (t, done) => {
+    const controller = new TalkingTomController({ postSpeechCooldownMs: 20, dedupWindowMs: 50 });
+    const recognizedPhrases = [];
+
+    controller.onPhraseFinalized = (phrase) => {
+      recognizedPhrases.push(phrase);
+      controller.setSpeaking(true);
+
+      // Simulate playback finishing after 30ms
+      setTimeout(() => {
+        controller.setSpeaking(false, 20);
+      }, 30);
+    };
+
+    controller.startListening();
+
+    // Phrase 1
+    controller.handleResult({
+      resultIndex: 0,
+      results: [
+        Object.assign([{ transcript: 'First sentence' }], { isFinal: true })
+      ]
+    });
+
+    // Phrase 1 should be processing -> speaking
+    assert.equal(recognizedPhrases.length, 1);
+    assert.equal(recognizedPhrases[0], 'First sentence');
+
+    // Wait for playback and cooldown to complete, returning to LISTENING
+    setTimeout(() => {
+      assert.equal(controller.state, LISTENING_STATES.LISTENING);
+
+      // Phrase 2 (hands-free, no button tap)
+      controller.handleResult({
+        resultIndex: 0,
+        results: [
+          Object.assign([{ transcript: 'Second sentence' }], { isFinal: true })
+        ]
+      });
+
+      assert.equal(recognizedPhrases.length, 2);
+      assert.equal(recognizedPhrases[1], 'Second sentence');
+      controller.destroy();
+      done();
+    }, 80);
+  });
+
+  it('suspends listening cleanly during AI Chat and resumes when returning', () => {
+    const controller = new TalkingTomController();
+    controller.startListening();
+    assert.equal(controller.state, LISTENING_STATES.LISTENING);
+
+    // Switch to AI chat tab
+    controller.pauseListening();
+    assert.equal(controller.state, LISTENING_STATES.PAUSED);
+    assert.equal(controller.wasListeningBeforeInterruption, true);
+
+    // Incoming speech while in AI Chat must be ignored
+    controller.handleResult({
+      resultIndex: 0,
+      results: [
+        Object.assign([{ transcript: 'Ignored while in chat' }], { isFinal: true })
+      ]
+    });
+    assert.equal(controller.lastProcessedPhrase, '');
+
+    // Return to main game tab
+    controller.resumeListening();
+    assert.equal(controller.state, LISTENING_STATES.LISTENING);
+    assert.equal(controller.wasListeningBeforeInterruption, false);
+
+    controller.destroy();
+  });
 });
 
 

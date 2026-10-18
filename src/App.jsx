@@ -233,6 +233,10 @@ export default function App() {
         onFallback: () => {
           // Handled within clonedVoiceEngine
         }
+      }).catch((err) => {
+        console.warn('speakPhraseWithMode error:', err);
+        handlePlaybackEnd();
+        talkingTomController.setSpeaking(false, 450);
       });
     };
 
