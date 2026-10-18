@@ -25,6 +25,32 @@ class ClonedVoiceEngine {
     this.lastGeneratedText = '';
     this.activeRequestId = 0;
     this.currentAbortController = null;
+    this.activeUtterance = null;
+    this.watchdogTimer = null;
+  }
+
+  /**
+   * Unlock AudioContext and SpeechSynthesis on user gesture
+   */
+  unlockAudio() {
+    if (typeof window !== 'undefined') {
+      try {
+        const ctx = this.getAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+      } catch {}
+      if ('speechSynthesis' in window) {
+        try {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+          const dummy = new SpeechSynthesisUtterance('');
+          dummy.volume = 0.01;
+          window.speechSynthesis.speak(dummy);
+        } catch {}
+      }
+    }
   }
 
   getAudioContext() {
@@ -368,8 +394,12 @@ class ClonedVoiceEngine {
     }
 
     try {
-      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
       const utterance = new SpeechSynthesisUtterance(text);
+      this.activeUtterance = utterance; // Strong reference prevents V8 GC mid-speech on Android Chrome
 
       // Support Devanagari Hindi / Bhojpuri and Indian English locales
       const hasDevanagari = /[\u0900-\u097F]/.test(text);
@@ -398,6 +428,30 @@ class ClonedVoiceEngine {
 
       this.isPlaying = true;
 
+      const finishPlayback = () => {
+        if (this.watchdogTimer) {
+          clearTimeout(this.watchdogTimer);
+          this.watchdogTimer = null;
+        }
+        if (this.mouthInterval) {
+          clearInterval(this.mouthInterval);
+          this.mouthInterval = null;
+        }
+        this.activeUtterance = null;
+        this.isPlaying = false;
+        onAmplitude(0);
+        onEnded();
+      };
+
+      // Watchdog timeout prevents infinite freeze if mobile browser drops onend
+      const maxDurationMs = Math.max(3000, Math.min(16000, text.length * 180));
+      this.watchdogTimer = setTimeout(() => {
+        if (this.isPlaying) {
+          console.warn('[ClonedVoiceEngine] Watchdog timer expired: auto-releasing speech lock.');
+          finishPlayback();
+        }
+      }, maxDurationMs);
+
       const startTime = Date.now();
       this.mouthInterval = setInterval(() => {
         if (!this.isPlaying) {
@@ -414,28 +468,19 @@ class ClonedVoiceEngine {
       }, 50);
 
       utterance.onend = () => {
-        this.isPlaying = false;
-        if (this.mouthInterval) {
-          clearInterval(this.mouthInterval);
-          this.mouthInterval = null;
-        }
-        onAmplitude(0);
-        onEnded();
+        finishPlayback();
       };
 
-      utterance.onerror = () => {
-        this.isPlaying = false;
-        if (this.mouthInterval) {
-          clearInterval(this.mouthInterval);
-          this.mouthInterval = null;
-        }
-        onAmplitude(0);
-        onEnded();
+      utterance.onerror = (err) => {
+        console.warn('[ClonedVoiceEngine] SpeechSynthesis error:', err);
+        finishPlayback();
       };
 
       window.speechSynthesis.speak(utterance);
-    } catch {
+    } catch (err) {
+      console.warn('[ClonedVoiceEngine] speakDirectText failed:', err);
       this.isPlaying = false;
+      this.activeUtterance = null;
       onEnded();
     }
   }
@@ -492,6 +537,13 @@ class ClonedVoiceEngine {
   stopPlayback() {
     this.cancelGeneration();
 
+    if (this.watchdogTimer) {
+      clearTimeout(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+
+    this.activeUtterance = null;
+
     if (this.mouthInterval) {
       clearInterval(this.mouthInterval);
       this.mouthInterval = null;
@@ -507,7 +559,9 @@ class ClonedVoiceEngine {
 
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
-        window.speechSynthesis.cancel();
+        if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+          window.speechSynthesis.cancel();
+        }
       } catch {}
     }
 

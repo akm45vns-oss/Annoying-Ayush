@@ -116,5 +116,70 @@ describe('Voice Modes & Interaction Preservation', () => {
       assert.equal(ended, true);
       assert.equal(synthUtterances.length, 0);
     });
+
+    it('primes audio with unlockAudio() on user touch to comply with mobile autoplay restrictions', () => {
+      let dummyUtterances = [];
+      let resumed = false;
+
+      globalThis.window.AudioContext = class MockAudioContext {
+        constructor() {
+          this.state = 'suspended';
+        }
+        async resume() {
+          resumed = true;
+          this.state = 'running';
+        }
+      };
+
+      globalThis.window.speechSynthesis = {
+        paused: true,
+        resume() {
+          this.paused = false;
+        },
+        speak(u) {
+          dummyUtterances.push(u);
+        }
+      };
+
+      clonedVoiceEngine.unlockAudio();
+
+      assert.equal(resumed, true, 'AudioContext must be resumed on user gesture');
+      assert.equal(dummyUtterances.length, 1, 'Dummy utterance must be spoken to prime mobile speech engine');
+      delete globalThis.window.AudioContext;
+    });
+
+    it('maintains strong utterance reference and active watchdog timer during playback, clearing them on completion', async () => {
+      let completed = false;
+
+      // Delayed utterance to inspect in-flight state
+      globalThis.window.speechSynthesis = {
+        cancel() {},
+        speak(utterance) {
+          synthUtterances.push(utterance);
+          // Keep active for 40ms
+          setTimeout(() => {
+            if (utterance.onend) utterance.onend();
+          }, 40);
+        }
+      };
+
+      await new Promise((resolve) => {
+        clonedVoiceEngine.speakPhraseWithMode('Testing mobile speech guard', 'funny', {
+          onEnded: () => {
+            completed = true;
+            resolve();
+          }
+        });
+
+        // Verify activeUtterance is held strongly while playing (prevents Android Chrome V8 GC)
+        assert.ok(clonedVoiceEngine.activeUtterance, 'Active utterance must be held strongly during playback');
+        assert.ok(clonedVoiceEngine.watchdogTimer, 'Watchdog timer must be armed during playback');
+      });
+
+      assert.equal(completed, true);
+      assert.equal(clonedVoiceEngine.activeUtterance, null, 'Active utterance reference must be released after completion');
+      assert.equal(clonedVoiceEngine.watchdogTimer, null, 'Watchdog timer must be cleared after completion');
+    });
   });
 });
+

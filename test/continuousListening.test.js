@@ -560,5 +560,31 @@ describe('Talking Tom Continuous Listening & Audio Loop Prevention', () => {
 
     controller.destroy();
   });
+
+  it('retains active recognition across speech cycles without aborting or restarting (stops Android mic sound loop)', (t, done) => {
+    const controller = new TalkingTomController({ postSpeechCooldownMs: 30 });
+    controller.startListening();
+    controller.handleStart(); // simulate recognition onstart
+    assert.equal(controller.isRecognitionActive, true);
+    assert.equal(mockRecognition.startCalls, 1);
+    assert.equal(mockRecognition.abortCalls, 0);
+
+    // Ayush starts speaking
+    controller.setSpeaking(true);
+    assert.equal(controller.state, LISTENING_STATES.SPEAKING);
+    assert.equal(mockRecognition.abortCalls, 0, 'Must NOT abort recognition during speech to avoid Android mic beeps');
+
+    // Speech finishes, cooldown begins
+    controller.setSpeaking(false, 25);
+    assert.equal(controller.state, LISTENING_STATES.PROCESSING);
+
+    setTimeout(() => {
+      assert.equal(controller.state, LISTENING_STATES.LISTENING);
+      assert.equal(mockRecognition.startCalls, 1, 'Must NOT restart recognition if already active');
+      assert.equal(mockRecognition.abortCalls, 0, 'Must have zero abort calls throughout speech cycle');
+      controller.destroy();
+      done();
+    }, 55);
+  });
 });
 

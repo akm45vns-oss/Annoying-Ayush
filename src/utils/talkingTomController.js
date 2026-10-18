@@ -24,6 +24,22 @@ export const LISTENING_STATES = {
 
 const OPT_IN_STORAGE_KEY = 'ayush_continuous_listening_opted_in';
 
+/**
+ * Safe metadata diagnostic logging (Development mode only)
+ * Never logs raw audio buffers, API keys, or sensitive speech text.
+ */
+export function logVoiceDiagnostic(event, metadata = {}) {
+  if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {
+    return;
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) {
+    console.info(`[AyushVoice:${event}]`, {
+      time: new Date().toISOString().substring(11, 23),
+      ...metadata
+    });
+  }
+}
+
 let permissionQueryInFlight = false;
 export async function checkMicrophonePermission() {
   if (permissionQueryInFlight) return 'prompt';
@@ -47,8 +63,8 @@ export class TalkingTomController {
       lang: 'hi-IN',
       recognitionLanguage: 'auto', // 'auto' | 'hi-IN' | 'hinglish' | 'en-IN' | 'bho-IN'
       silenceThresholdMs: 1100,
-      postSpeechCooldownMs: 500,
-      dedupWindowMs: 3000,
+      postSpeechCooldownMs: 450,
+      dedupWindowMs: 1800,
       maxRapidRestarts: 5,
       rapidRestartWindowMs: 4000,
       ...options
@@ -56,6 +72,7 @@ export class TalkingTomController {
 
     this.state = LISTENING_STATES.IDLE;
     this.recognition = null;
+    this.isRecognitionActive = false;
     this.isExplicitlyEnabled = false;
     this.wasListeningBeforeHidden = false;
     this.wasListeningBeforeInterruption = false;
@@ -310,23 +327,20 @@ export class TalkingTomController {
 
   /**
    * Coordinates exclusive audio ownership:
-   * When Ayush begins speaking, recognition is suspended.
+   * When Ayush begins speaking, incoming speech results are software-gated without tearing down recognition.
    * When playback ends, a cooldown prevents recognizing speaker echoes.
    */
   setSpeaking(isSpeaking, cooldownMs = this.options.postSpeechCooldownMs) {
     this.clearAllTimers();
 
     if (isSpeaking) {
-      // Transition to SPEAKING state and suspend recognition immediately
+      // Transition to SPEAKING state (handleResult immediately ignores any input)
+      logVoiceDiagnostic('speaking_started', { generation: this.sessionGeneration });
       this.setState(LISTENING_STATES.SPEAKING);
-      if (this.recognition) {
-        try {
-          this.recognition.abort();
-        } catch {}
-      }
       this.currentInterimText = '';
     } else {
       // Audio finished playing
+      logVoiceDiagnostic('speaking_finished', { cooldownMs });
       if (!this.isExplicitlyEnabled) {
         this.setState(LISTENING_STATES.IDLE);
         return;
@@ -340,13 +354,22 @@ export class TalkingTomController {
         if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING) {
           return;
         }
-        this.attemptRecognitionStart(currentGen);
+
+        // If recognition stayed active in the background, simply resume listening without restarting
+        if (this.isRecognitionActive) {
+          this.setState(LISTENING_STATES.LISTENING);
+        } else {
+          // If browser naturally ended recognition during playback, restart it now
+          this.attemptRecognitionStart(currentGen);
+        }
       }, cooldownMs);
     }
   }
 
   handleStart() {
-    if (this.isExplicitlyEnabled && this.state !== LISTENING_STATES.SPEAKING) {
+    this.isRecognitionActive = true;
+    logVoiceDiagnostic('recognition_onstart', { generation: this.sessionGeneration, state: this.state });
+    if (this.isExplicitlyEnabled && this.state !== LISTENING_STATES.SPEAKING && this.state !== LISTENING_STATES.PROCESSING) {
       this.setState(LISTENING_STATES.LISTENING);
     }
   }
@@ -358,6 +381,11 @@ export class TalkingTomController {
     if (generation !== this.sessionGeneration) return;
     if (!this.recognition || !this.isExplicitlyEnabled) return;
     if (this.state === LISTENING_STATES.SPEAKING) {
+      return;
+    }
+
+    if (this.isRecognitionActive) {
+      this.setState(LISTENING_STATES.LISTENING);
       return;
     }
 
@@ -489,13 +517,9 @@ export class TalkingTomController {
     this.lastProcessedPhrase = clean;
     this.lastProcessedTime = now;
 
-    // Suspend recognition while processing to guarantee no feedback
+    // Suspend recognition while processing to guarantee no feedback (software-gated)
     this.setState(LISTENING_STATES.PROCESSING, { phrase: clean });
-    if (this.recognition) {
-      try {
-        this.recognition.abort();
-      } catch {}
-    }
+    logVoiceDiagnostic('phrase_finalized', { length: clean.length, lang: this.options.lang });
 
     if (typeof this.onPhraseFinalized === 'function') {
       try {
@@ -508,6 +532,8 @@ export class TalkingTomController {
 
   handleError(event) {
     const errorType = event?.error || 'unknown';
+    this.isRecognitionActive = false;
+    logVoiceDiagnostic('recognition_onerror', { error: errorType, state: this.state });
 
     // Normal non-fatal conditions
     if (errorType === 'no-speech') {
@@ -563,8 +589,16 @@ export class TalkingTomController {
   }
 
   handleEnd(generation = this.sessionGeneration) {
+    this.isRecognitionActive = false;
+    logVoiceDiagnostic('recognition_onend', { generation, state: this.state });
+
     // If generation is stale, ignore callback completely!
     if (generation !== this.sessionGeneration) return;
+
+    // If speaking or processing, do not restart yet; setSpeaking(false) handles return to listening cleanly after cooldown
+    if (this.state === LISTENING_STATES.SPEAKING || this.state === LISTENING_STATES.PROCESSING) {
+      return;
+    }
 
     // If the controller is in LISTENING or STARTING state and user wants continuous listening,
     // gracefully restart recognition after a brief debounce without audible alerts
@@ -575,7 +609,7 @@ export class TalkingTomController {
         if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING)) {
           this.attemptRecognitionStart(generation);
         }
-      }, 200);
+      }, 350);
     }
   }
 

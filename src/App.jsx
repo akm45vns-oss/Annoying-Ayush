@@ -257,6 +257,7 @@ export default function App() {
   const handleStartListening = useCallback(() => {
     soundManager.playPop();
     setMicErrorMessage('');
+    clonedVoiceEngine.unlockAudio();
     talkingTomController.startListening();
   }, []);
 
@@ -266,6 +267,7 @@ export default function App() {
     if (talkingTomController.isExplicitlyEnabled) {
       talkingTomController.stopListening();
     } else {
+      clonedVoiceEngine.unlockAudio();
       talkingTomController.startListening();
     }
   }, []);
