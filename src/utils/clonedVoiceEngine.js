@@ -225,22 +225,24 @@ class ClonedVoiceEngine {
       this.analyser = analyser;
 
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-16, ctx.currentTime);
+      compressor.threshold.setValueAtTime(-14, ctx.currentTime);
       compressor.knee.setValueAtTime(24, ctx.currentTime);
-      compressor.ratio.setValueAtTime(5, ctx.currentTime);
+      compressor.ratio.setValueAtTime(3.5, ctx.currentTime);
       compressor.attack.setValueAtTime(0.003, ctx.currentTime);
       compressor.release.setValueAtTime(0.15, ctx.currentTime);
 
       const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(0.95, ctx.currentTime);
+      // Enhanced master gain to ensure speech is comfortably audible on mobile phone speakers
+      masterGain.gain.setValueAtTime(1.35, ctx.currentTime);
 
       if (mode === 'funny') {
         // Funny Chipmunk Effect applied to the cloned voice
-        source.playbackRate.setValueAtTime(1.44, ctx.currentTime);
+        source.playbackRate.setValueAtTime(1.35, ctx.currentTime);
 
         const highpass = ctx.createBiquadFilter();
         highpass.type = 'highpass';
-        highpass.frequency.setValueAtTime(260, ctx.currentTime);
+        // Lowered from 260Hz to 120Hz to preserve fundamental vocal power and body
+        highpass.frequency.setValueAtTime(120, ctx.currentTime);
 
         const formantBoost = ctx.createBiquadFilter();
         formantBoost.type = 'peaking';
@@ -326,9 +328,12 @@ class ClonedVoiceEngine {
         } catch {}
       }
 
+      utterance.volume = 1.0;
+
       if (mode === 'funny') {
-        utterance.pitch = 1.6;
-        utterance.rate = 1.35;
+        // Tuned for clear, loud chipmunk playback without clipping vocal formants
+        utterance.pitch = 1.45;
+        utterance.rate = 1.20;
       } else {
         utterance.pitch = 1.0;
         utterance.rate = 1.0;
@@ -418,9 +423,12 @@ class ClonedVoiceEngine {
         } catch {}
       }
 
+      utterance.volume = 1.0;
+
       if (mode === 'funny') {
-        utterance.pitch = 1.6;
-        utterance.rate = 1.35;
+        // Tuned for clear, loud chipmunk playback without clipping vocal formants
+        utterance.pitch = 1.45;
+        utterance.rate = 1.20;
       } else {
         utterance.pitch = 1.0;
         utterance.rate = 1.0;

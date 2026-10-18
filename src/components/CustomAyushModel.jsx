@@ -130,28 +130,52 @@ export default function CustomAyushModel({
   // Setup animations if present
   const { actions, names } = useAnimations(animations, groupRef);
 
-  // Play animation clips (e.g. WalkAndTalk, Walk, etc.)
+  // Play animation clips: only play true standing idle clip if bundled;
+  // otherwise stop walking/running clips during idle so the character stands naturally!
   useEffect(() => {
     if (!actions || names.length === 0) return;
 
-    // Support WalkAndTalk, Walk, or the primary clip
+    // Detect true idle clip if bundled (e.g. idle, stand, breath, waiting)
+    const idleClipName = names.find(n => /^(idle|stand|breath|waiting)$/i.test(n) || /(idle|standing)/i.test(n));
+    // Detect energetic or walking clip for game events (dance, walk)
     const walkClipName = names.find(n => /walk|talk/i.test(n)) || names[0];
-    const walkAction = actions[walkClipName];
 
-    if (walkAction) {
-      if (currentAction === 'dance') {
-        walkAction.setEffectiveTimeScale(1.4);
-      } else if (currentAction === 'talking') {
-        walkAction.setEffectiveTimeScale(1.1);
-      } else if (currentAction === 'laugh') {
-        walkAction.setEffectiveTimeScale(1.25);
-      } else if (currentAction === 'kiss') {
-        walkAction.setEffectiveTimeScale(0.7);
-      } else {
-        // Natural relaxed stride for idle
-        walkAction.setEffectiveTimeScale(0.85);
+    if (currentAction === 'dance') {
+      const activeClip = actions[walkClipName] || (idleClipName ? actions[idleClipName] : null);
+      if (activeClip) {
+        activeClip.setEffectiveTimeScale(1.4);
+        activeClip.reset().fadeIn(0.25).play();
       }
-      walkAction.reset().fadeIn(0.25).play();
+      return () => {
+        if (activeClip) activeClip.fadeOut(0.25);
+      };
+    }
+
+    if (currentAction === 'idle') {
+      // If a dedicated idle clip exists, play it gently
+      if (idleClipName && actions[idleClipName]) {
+        const idleAction = actions[idleClipName];
+        idleAction.setEffectiveTimeScale(1.0);
+        idleAction.reset().fadeIn(0.3).play();
+        return () => {
+          idleAction.fadeOut(0.3);
+        };
+      } else {
+        // If no idle clip exists (e.g. only WalkAndTalk is bundled), stop all walking/exercise clips!
+        // The procedural posture in useFrame maintains a natural standing pose with relaxed arms and breathing.
+        Object.values(actions).forEach(act => {
+          if (act && act.isRunning()) {
+            act.fadeOut(0.3);
+          }
+        });
+      }
+    } else {
+      // For other interactions (kiss, hug, laugh, etc.), stop any background walking clip
+      Object.values(actions).forEach(act => {
+        if (act && act.isRunning()) {
+          act.fadeOut(0.2);
+        }
+      });
     }
   }, [currentAction, actions, names]);
 
@@ -272,7 +296,7 @@ export default function CustomAyushModel({
 
     // 3. Humanoid Armature Animation (Head, Jaw & Procedural Arms/Body)
     const bones = bonesRef.current;
-    const hasBakedClips = names && names.length > 0;
+    const isClipRunning = actions && Object.values(actions).some(act => act && act.isRunning());
 
     // Head nods & emotional tilt (always active, as WalkAndTalk has no head track)
     if (bones.head) {
@@ -319,8 +343,8 @@ export default function CustomAyushModel({
       bones.jaw.rotation.x = THREE.MathUtils.damp(bones.jaw.rotation.x, extraJaw, 15, delta);
     }
 
-    // Procedural Arms/Body only when model has no baked skeletal animation clips
-    if (!hasBakedClips && bones.leftArm && bones.rightArm) {
+    // Procedural Arms/Body when no baked animation clip is actively playing (e.g. natural standing idle)
+    if (!isClipRunning && bones.leftArm && bones.rightArm) {
       let targetLeftArmZ = 1.15;
       let targetRightArmZ = -1.15;
       let targetLeftArmY = 0;
@@ -387,8 +411,8 @@ export default function CustomAyushModel({
       }
     }
 
-    // 4. Subtle Base Stage Breathing (fallback if no baked clips)
-    if (groupRef.current && !hasBakedClips) {
+    // 4. Subtle Base Stage Breathing (when standing idle)
+    if (groupRef.current && !isClipRunning) {
       const breathe = Math.sin(t * 2.2) * 0.015;
       groupRef.current.position.y = breathe;
     }

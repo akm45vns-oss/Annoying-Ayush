@@ -87,6 +87,8 @@ export class TalkingTomController {
     this.silenceTimer = null;
     this.cooldownTimer = null;
     this.restartTimer = null;
+    this.pendingRestartTimer = null;
+    this.consecutiveSilenceCount = 0;
 
     // Bounded restart rate tracker
     this.recentRestartTimes = [];
@@ -243,6 +245,7 @@ export class TalkingTomController {
 
     this.isExplicitlyEnabled = true;
     this.setOptedIn(true);
+    this.consecutiveSilenceCount = 0;
 
     // If already actively running, do not duplicate start
     if (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING) {
@@ -326,9 +329,37 @@ export class TalkingTomController {
   }
 
   /**
+   * Centralized restart coordinator: Prevents competing timers and duplicate restart requests
+   */
+  scheduleRestart(delayMs = 0, reason = 'auto') {
+    if (!this.isExplicitlyEnabled) return;
+    if (this.state === LISTENING_STATES.SPEAKING) return;
+
+    const currentGen = this.sessionGeneration;
+    if (this.pendingRestartTimer) {
+      clearTimeout(this.pendingRestartTimer);
+      this.pendingRestartTimer = null;
+    }
+
+    logVoiceDiagnostic('restart_scheduled', { delayMs, reason, generation: currentGen });
+
+    this.pendingRestartTimer = setTimeout(() => {
+      this.pendingRestartTimer = null;
+      if (currentGen !== this.sessionGeneration) return;
+      if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING) return;
+
+      if (this.isRecognitionActive) {
+        this.setState(LISTENING_STATES.LISTENING);
+      } else {
+        this.attemptRecognitionStart(currentGen);
+      }
+    }, delayMs);
+  }
+
+  /**
    * Coordinates exclusive audio ownership:
    * When Ayush begins speaking, incoming speech results are software-gated without tearing down recognition.
-   * When playback ends, a cooldown prevents recognizing speaker echoes.
+   * When playback ends, a single unified restart schedules recognition after speaker cooldown.
    */
   setSpeaking(isSpeaking, cooldownMs = this.options.postSpeechCooldownMs) {
     this.clearAllTimers();
@@ -346,23 +377,10 @@ export class TalkingTomController {
         return;
       }
 
+      this.consecutiveSilenceCount = 0;
       // Safe cooldown buffer so room/speaker reflections are not re-recognized
       this.setState(LISTENING_STATES.PROCESSING, { message: 'Readying microphone...' });
-      const currentGen = this.sessionGeneration;
-      this.cooldownTimer = setTimeout(() => {
-        if (currentGen !== this.sessionGeneration) return;
-        if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING) {
-          return;
-        }
-
-        // If recognition stayed active in the background, simply resume listening without restarting
-        if (this.isRecognitionActive) {
-          this.setState(LISTENING_STATES.LISTENING);
-        } else {
-          // If browser naturally ended recognition during playback, restart it now
-          this.attemptRecognitionStart(currentGen);
-        }
-      }, cooldownMs);
+      this.scheduleRestart(cooldownMs, 'playback_finished');
     }
   }
 
@@ -516,6 +534,7 @@ export class TalkingTomController {
 
     this.lastProcessedPhrase = clean;
     this.lastProcessedTime = now;
+    this.consecutiveSilenceCount = 0;
 
     // Suspend recognition while processing to guarantee no feedback (software-gated)
     this.setState(LISTENING_STATES.PROCESSING, { phrase: clean });
@@ -537,7 +556,8 @@ export class TalkingTomController {
 
     // Normal non-fatal conditions
     if (errorType === 'no-speech') {
-      // Room was quiet; recognition will automatically end or restart cleanly
+      this.consecutiveSilenceCount++;
+      logVoiceDiagnostic('no_speech_detected', { count: this.consecutiveSilenceCount });
       return;
     }
     if (errorType === 'aborted') {
@@ -600,16 +620,15 @@ export class TalkingTomController {
       return;
     }
 
-    // If the controller is in LISTENING or STARTING state and user wants continuous listening,
-    // gracefully restart recognition after a brief debounce without audible alerts
+    // Gracefully coordinate continuous listening restart through centralized scheduler
     if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING)) {
-      if (this.restartTimer) clearTimeout(this.restartTimer);
-      this.restartTimer = setTimeout(() => {
-        if (generation !== this.sessionGeneration) return;
-        if (this.isExplicitlyEnabled && (this.state === LISTENING_STATES.LISTENING || this.state === LISTENING_STATES.STARTING)) {
-          this.attemptRecognitionStart(generation);
-        }
-      }, 350);
+      if (this.consecutiveSilenceCount >= 2) {
+        // Back off on prolonged empty room silence: prevents continuous Android Google Speech earcon sound loop!
+        logVoiceDiagnostic('silence_backoff', { silenceCount: this.consecutiveSilenceCount });
+        this.scheduleRestart(3500, 'silence_backoff');
+      } else {
+        this.scheduleRestart(400, 'recognition_ended');
+      }
     }
   }
 
@@ -648,6 +667,10 @@ export class TalkingTomController {
     if (this.restartTimer) {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
+    }
+    if (this.pendingRestartTimer) {
+      clearTimeout(this.pendingRestartTimer);
+      this.pendingRestartTimer = null;
     }
   }
 

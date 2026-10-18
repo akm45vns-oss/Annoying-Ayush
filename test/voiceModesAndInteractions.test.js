@@ -29,6 +29,7 @@ describe('Voice Modes & Interaction Preservation', () => {
         this.text = text;
         this.pitch = 1.0;
         this.rate = 1.0;
+        this.volume = 0.5; // Starts at default fractional volume
         this.onend = null;
         this.onerror = null;
       }
@@ -42,7 +43,7 @@ describe('Voice Modes & Interaction Preservation', () => {
   });
 
   describe('Voice Mode Dispatching', () => {
-    it('routes "funny" mode to chipmunk pitch-shifted speech synthesis (pitch 1.6, rate 1.35)', async () => {
+    it('routes "funny" mode to chipmunk speech synthesis with max volume (volume 1.0, pitch 1.45, rate 1.2)', async () => {
       let started = false;
       let ended = false;
 
@@ -60,11 +61,12 @@ describe('Voice Modes & Interaction Preservation', () => {
       assert.equal(ended, true);
       assert.equal(synthUtterances.length, 1);
       assert.equal(synthUtterances[0].text, 'Hello darling!');
-      assert.equal(synthUtterances[0].pitch, 1.6, 'Funny voice must use cartoon pitch 1.6');
-      assert.equal(synthUtterances[0].rate, 1.35, 'Funny voice must use rate 1.35');
+      assert.equal(synthUtterances[0].volume, 1.0, 'Funny voice must explicitly set max volume 1.0');
+      assert.equal(synthUtterances[0].pitch, 1.45, 'Funny voice must use intelligible cartoon pitch 1.45');
+      assert.equal(synthUtterances[0].rate, 1.2, 'Funny voice must use rate 1.2');
     });
 
-    it('routes "device" mode to standard browser speech synthesis (pitch 1.0, rate 1.0)', async () => {
+    it('routes "device" mode to standard browser speech synthesis with max volume (volume 1.0, pitch 1.0, rate 1.0)', async () => {
       let started = false;
 
       await clonedVoiceEngine.speakPhraseWithMode('Good morning sweetheart', 'device', {
@@ -74,6 +76,7 @@ describe('Voice Modes & Interaction Preservation', () => {
       assert.equal(started, true);
       assert.equal(synthUtterances.length, 1);
       assert.equal(synthUtterances[0].text, 'Good morning sweetheart');
+      assert.equal(synthUtterances[0].volume, 1.0, 'Device voice must set maximum volume 1.0');
       assert.equal(synthUtterances[0].pitch, 1.0, 'Device voice must use natural pitch 1.0');
       assert.equal(synthUtterances[0].rate, 1.0, 'Device voice must use natural rate 1.0');
     });

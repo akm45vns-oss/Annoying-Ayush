@@ -59,20 +59,26 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
   });
 
   it('AyushScene camera and OrbitControls are framed to ensure character head and face are completely visible without clipping', () => {
-    assert.match(sceneSource, /position:\s*\[0,\s*0\.46,\s*3\.82\]/);
-    assert.match(sceneSource, /fov:\s*46/);
-    assert.match(sceneSource, /target=\{\[0,\s*0\.42,\s*0\]\}/);
+    assert.match(sceneSource, /position:\s*\[0,\s*0\.28,\s*3\.24\]/);
+    assert.match(sceneSource, /fov:\s*44/);
+    assert.match(sceneSource, /target=\{\[0,\s*0\.24,\s*0\]\}/);
 
-    // Verify mathematical bounds guarantee zero head clipping:
-    // Distance = 3.82, FOV = 46 deg => Half-frustum height = 3.82 * tan(23 deg) ~ 1.621
-    // Target Y = 0.42 => Top of frustum = 0.42 + 1.621 = 2.041
-    // Hair top = 1.84 => Headroom is +0.201 units, ensuring whole head and face remain visible during all animations
-    const targetY = 0.42;
-    const distance = 3.82;
-    const halfFovRad = (46 / 2) * (Math.PI / 180);
+    // Verify mathematical bounds guarantee zero head clipping and prominent 75-85% framing:
+    // Distance = 3.24, FOV = 44 deg => Half-frustum height = 3.24 * tan(22 deg) ~ 1.309
+    // Full frustum height = 2.618 units.
+    // Model height = 2.18 units => 2.18 / 2.618 = 83.3% of vertical canvas height (within 75-85% requirement)
+    // Target Y = 0.24 => Top of frustum = 0.24 + 1.309 = 1.549
+    // Hair top = 1.30 in custom model (1.40 in procedural) => Headroom is +0.15 to +0.25 units
+    const targetY = 0.24;
+    const distance = 3.24;
+    const halfFovRad = (44 / 2) * (Math.PI / 180);
     const frustumTop = targetY + distance * Math.tan(halfFovRad);
-    const hairTop = 1.84;
+    const hairTop = 1.30;
     assert.ok(frustumTop > hairTop, `Frustum top (${frustumTop.toFixed(3)}) must be strictly above hair top (${hairTop})`);
+
+    const frustumHeight = 2 * distance * Math.tan(halfFovRad);
+    const framingRatio = 2.18 / frustumHeight;
+    assert.ok(framingRatio >= 0.75 && framingRatio <= 0.85, `Framing ratio (${(framingRatio * 100).toFixed(1)}%) must be between 75% and 85%`);
   });
 
   it('Settings modal contains Indian language recognition selection with honest capability indicators', () => {
@@ -104,5 +110,13 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
   it('App.jsx renders a single clear start prompt when hands-free listening is not active', () => {
     assert.match(appSource, /tom-start-prompt-btn/);
     assert.match(appSource, /Tap to Talk to Ayush 🎙️/);
+  });
+
+  it('CustomAyushModel suppresses WalkAndTalk loops during idle and provides natural standing pose', () => {
+    const modelSource = fs.readFileSync(path.resolve(process.cwd(), 'src/components/CustomAyushModel.jsx'), 'utf8');
+    assert.match(modelSource, /idleClipName/);
+    assert.match(modelSource, /targetLeftArmZ = 1\.15/);
+    assert.match(modelSource, /targetRightArmZ = -1\.15/);
+    assert.match(modelSource, /act\.fadeOut\(0\.3\)/);
   });
 });

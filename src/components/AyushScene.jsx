@@ -92,8 +92,8 @@ export default function AyushScene({
     <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
       <Canvas
         shadows
-        // Camera positioned and focused on Ayush's vertical center (y=0.42) for prominent, unclipped full-body framing (65-75% viewport)
-        camera={{ position: [0, 0.46, 3.82], fov: 46 }}
+        // Camera positioned and focused on Ayush's vertical center (y=0.24) for prominent, unclipped full-body framing (78-83% viewport height)
+        camera={{ position: [0, 0.28, 3.24], fov: 44 }}
         gl={{ antialias: true, alpha: true }}
       >
         {/* Ambient & Key Lighting */}
@@ -132,11 +132,11 @@ export default function AyushScene({
 
         {/* Constrained Camera Orbit Controls centered on character midpoint */}
         <OrbitControls
-          target={[0, 0.42, 0]}
+          target={[0, 0.24, 0]}
           enablePan={false}
           enableZoom={true}
-          minDistance={2.2}
-          maxDistance={4.8}
+          minDistance={2.0}
+          maxDistance={4.2}
           minPolarAngle={Math.PI / 2.8}
           maxPolarAngle={Math.PI / 1.95}
           dampingFactor={0.06}

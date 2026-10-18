@@ -586,5 +586,50 @@ describe('Talking Tom Continuous Listening & Audio Loop Prevention', () => {
       done();
     }, 55);
   });
+
+  it('backs off restart interval during prolonged empty room silence to prevent continuous Android Google Speech earcon sound loop', () => {
+    const controller = new TalkingTomController();
+    controller.startListening();
+    assert.equal(controller.consecutiveSilenceCount, 0);
+
+    // Simulate first silence timeout (no-speech)
+    controller.handleError({ error: 'no-speech' });
+    assert.equal(controller.consecutiveSilenceCount, 1);
+    controller.handleEnd();
+    assert.ok(controller.pendingRestartTimer, 'Single silence should schedule standard restart');
+
+    // Simulate second consecutive silence timeout
+    controller.handleError({ error: 'no-speech' });
+    assert.equal(controller.consecutiveSilenceCount, 2);
+    controller.handleEnd();
+    assert.ok(controller.pendingRestartTimer, 'Consecutive silence must schedule backoff restart');
+
+    // Speaking a phrase resets consecutive silence count
+    controller.processFinalPhrase('Hello Ayush');
+    assert.equal(controller.consecutiveSilenceCount, 0, 'Speech processing must reset consecutive silence count');
+
+    controller.destroy();
+  });
+
+  it('scheduleRestart unifies restart requests and avoids competing cooldown and restart timers', (t, done) => {
+    const controller = new TalkingTomController({ postSpeechCooldownMs: 20 });
+    controller.startListening();
+
+    // Trigger multiple rapid restart requests
+    controller.scheduleRestart(30, 'reason_1');
+    const timer1 = controller.pendingRestartTimer;
+    controller.scheduleRestart(40, 'reason_2');
+    const timer2 = controller.pendingRestartTimer;
+
+    assert.notEqual(timer1, timer2, 'New scheduleRestart must clear previous pending timer');
+    assert.ok(controller.pendingRestartTimer, 'Must maintain exactly one pending restart timer');
+
+    setTimeout(() => {
+      assert.equal(controller.pendingRestartTimer, null, 'Pending restart timer must be cleared after firing');
+      controller.destroy();
+      done();
+    }, 60);
+  });
 });
+
 
