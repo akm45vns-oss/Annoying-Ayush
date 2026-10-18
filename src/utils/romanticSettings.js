@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS = {
   romanticMessagesEnabled: true,
   floatingEffectsEnabled: true,
   customModelUrl: '',
-  voiceMode: 'funny',
+  voiceMode: 'device',
   recognitionLanguage: 'auto',
 };
 

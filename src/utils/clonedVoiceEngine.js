@@ -170,9 +170,19 @@ class ClonedVoiceEngine {
         };
       }
 
+      if (data && data.providerError) {
+        return {
+          ok: false,
+          isCloned: false,
+          fallbackReason: 'provider_error',
+          error: data.error || 'Voice service provider error.'
+        };
+      }
+
       return {
         ok: false,
         isCloned: false,
+        fallbackReason: 'service_error',
         error: data?.error || 'Could not generate speech.'
       };
     } catch (err) {
@@ -286,7 +296,9 @@ class ClonedVoiceEngine {
         const normalized = avg > 10 ? Math.min(1.0, (avg - 10) / 115) : 0;
         onAmplitude(normalized);
 
-        this.animFrameId = requestAnimationFrame(updateAmplitude);
+        if (typeof requestAnimationFrame === 'function') {
+          this.animFrameId = requestAnimationFrame(updateAmplitude);
+        }
       };
 
       updateAmplitude();
@@ -295,7 +307,9 @@ class ClonedVoiceEngine {
         this.isPlaying = false;
         this.currentSource = null;
         if (this.animFrameId) {
-          cancelAnimationFrame(this.animFrameId);
+          if (typeof cancelAnimationFrame === 'function') {
+            cancelAnimationFrame(this.animFrameId);
+          }
           this.animFrameId = null;
         }
         onAmplitude(0);
@@ -386,6 +400,89 @@ class ClonedVoiceEngine {
   }
 
   /**
+   * Selects the highest quality Indian Male voice available in the browser.
+   * Prioritizes male Indian Hindi/Bhojpuri (Madhur, Google hi-IN male, hie, hic)
+   * or male Indian English (Prabhat, Ravi, Google en-IN male, ene, end).
+   * 
+   * @param {string} text - Text to synthesize
+   * @returns {SpeechSynthesisVoice|null}
+   */
+  getBestIndianMaleVoice(text) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+    try {
+      const voices = (window.speechSynthesis.getVoices && window.speechSynthesis.getVoices()) || [];
+      if (!voices || voices.length === 0) return null;
+
+      const hasDevanagari = /[\u0900-\u097F]/.test(text || '');
+
+      const isMale = (v) => {
+        const name = (v.name || '').toLowerCase();
+        const uri = (v.voiceURI || '').toLowerCase();
+        return (
+          name.includes('male') ||
+          name.includes('madhur') ||
+          name.includes('prabhat') ||
+          name.includes('hemant') ||
+          name.includes('ravi') ||
+          name.includes('hie') ||
+          name.includes('hic') ||
+          name.includes('ene') ||
+          name.includes('end') ||
+          uri.includes('male') ||
+          uri.includes('madhur') ||
+          uri.includes('prabhat')
+        );
+      };
+
+      const isHindi = (v) => {
+        const lang = (v.lang || '').toLowerCase().replace('_', '-');
+        return lang.startsWith('hi') || lang.includes('hi-in');
+      };
+
+      const isIndianEnglish = (v) => {
+        const lang = (v.lang || '').toLowerCase().replace('_', '-');
+        return lang === 'en-in' || lang.includes('en-in');
+      };
+
+      if (hasDevanagari) {
+        // Devanagari Script (Hindi / Bhojpuri)
+        // 1. Male Hindi
+        const maleHi = voices.find((v) => isHindi(v) && isMale(v));
+        if (maleHi) return maleHi;
+        // 2. Any Hindi voice
+        const anyHi = voices.find((v) => isHindi(v));
+        if (anyHi) return anyHi;
+        // 3. Male Indian English
+        const maleEnIn = voices.find((v) => isIndianEnglish(v) && isMale(v));
+        if (maleEnIn) return maleEnIn;
+      } else {
+        // Latin Script (Indian English or Hinglish)
+        // 1. Male Indian English
+        const maleEnIn = voices.find((v) => isIndianEnglish(v) && isMale(v));
+        if (maleEnIn) return maleEnIn;
+        // 2. Male Hindi (natural pronunciation for Hinglish)
+        const maleHi = voices.find((v) => isHindi(v) && isMale(v));
+        if (maleHi) return maleHi;
+        // 3. Any Indian English
+        const anyEnIn = voices.find((v) => isIndianEnglish(v));
+        if (anyEnIn) return anyEnIn;
+        // 4. Any Hindi
+        const anyHi = voices.find((v) => isHindi(v));
+        if (anyHi) return anyHi;
+      }
+
+      // Broad fallback: Any Indian locale or first male voice
+      return (
+        voices.find((v) => isIndianEnglish(v) || isHindi(v)) ||
+        voices.find((v) => isMale(v)) ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Directly speak text via browser SpeechSynthesis with realistic mouth animation
    */
   speakDirectText(text, mode = 'funny', onAmplitude = () => {}, onEnded = () => {}) {
@@ -415,17 +512,13 @@ class ClonedVoiceEngine {
       const hasDevanagari = /[\u0900-\u097F]/.test(text);
       utterance.lang = hasDevanagari ? 'hi-IN' : 'en-IN';
 
-      if (window.speechSynthesis.getVoices) {
-        try {
-          const voices = window.speechSynthesis.getVoices();
-          if (hasDevanagari) {
-            const hiVoice = voices.find((v) => v.lang && (v.lang.startsWith('hi') || v.lang.toLowerCase().includes('hi-in')));
-            if (hiVoice) utterance.voice = hiVoice;
-          } else {
-            const inVoice = voices.find((v) => v.lang && (v.lang === 'en-IN' || v.lang.toLowerCase().includes('en-in')));
-            if (inVoice) utterance.voice = inVoice;
-          }
-        } catch {}
+      // Select natural Indian Male Voice
+      const bestVoice = this.getBestIndianMaleVoice(text);
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+        if (bestVoice.lang) {
+          utterance.lang = bestVoice.lang;
+        }
       }
 
       utterance.volume = 1.0;
@@ -579,7 +672,9 @@ class ClonedVoiceEngine {
     }
 
     if (this.animFrameId) {
-      cancelAnimationFrame(this.animFrameId);
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(this.animFrameId);
+      }
       this.animFrameId = null;
     }
 
@@ -594,6 +689,7 @@ class ClonedVoiceEngine {
     this.stopPlayback();
     this.cachedAudioBuffer = null;
     this.lastGeneratedText = '';
+    this.audioCtx = null;
   }
 }
 

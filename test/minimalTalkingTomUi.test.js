@@ -102,11 +102,11 @@ describe('Minimal Talking Tom Experience — UI Simplification Verification', ()
     assert.match(settingsSource, /Browser Web Speech API active/);
   });
 
-  it('Settings modal contains the compact 3-mode Voice & Repeat Style selector', () => {
-    assert.match(settingsSource, /Voice & Repeat Style/);
-    assert.match(settingsSource, /Funny Ayush/);
-    assert.match(settingsSource, /Device Voice/);
-    assert.match(settingsSource, /Cloned Voice/);
+  it('Settings modal uses Free Indian Male Voice Engine and contains no voice chooser options', () => {
+    assert.match(settingsSource, /Voice Repetition Engine/);
+    assert.match(settingsSource, /Free Indian Male Voice Engine/);
+    assert.doesNotMatch(settingsSource, /Funny Ayush/);
+    assert.doesNotMatch(settingsSource, /Cloned Voice/);
   });
 
   it('App.jsx does not display recognized phrase in speech bubble (no transcripts/subtitles)', () => {

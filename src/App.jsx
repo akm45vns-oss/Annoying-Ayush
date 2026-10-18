@@ -9,6 +9,7 @@ import SecretLetterModal from './components/SecretLetterModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
 import { clonedVoiceEngine } from './utils/clonedVoiceEngine';
+import { ayushVoicePack } from './utils/ayushVoicePack';
 import { 
   talkingTomController, 
   LISTENING_STATES, 
@@ -52,7 +53,6 @@ export default function App() {
   // Milestone 3 & 4: Voice repeat state (authoritative Talking Tom lifecycle)
   const [activeTab, setActiveTab] = useState('play'); // 'play' | 'chat'
   const prevTabRef = useRef(activeTab);
-  const voiceMode = settings.voiceMode || 'funny';
   const [talkingVolume, setTalkingVolume] = useState(0);
   const [listeningState, setListeningState] = useState(() => talkingTomController.state);
   const [micErrorMessage, setMicErrorMessage] = useState('');
@@ -202,6 +202,10 @@ export default function App() {
       clonedVoiceEngine.stopPlayback();
       didStop = true;
     }
+    if (ayushVoicePack.isPlaying) {
+      ayushVoicePack.stopPlayback();
+      didStop = true;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch {}
       didStop = true;
@@ -211,15 +215,15 @@ export default function App() {
   }, []);
 
   // Talking Tom Continuous Repeat Loop:
-  // When user finishes a phrase, Ayush repeats it using the active voiceMode,
+  // When user finishes a phrase, Ayush repeats it using the Free Indian Male Voice Engine,
   // then resumes listening after a feedback-preventing cooldown.
   // Requirement 5: Do NOT show transcript or subtitles in SpeechBubble!
   useEffect(() => {
     talkingTomController.onPhraseFinalized = (phrase) => {
       talkingTomController.setSpeaking(true);
 
-      const activeVoice = settings.voiceMode || voiceMode || 'funny';
-      clonedVoiceEngine.speakPhraseWithMode(phrase, activeVoice, {
+      // Permanently use Free Indian Male Voice Engine ('device' mode) for speech repetition
+      clonedVoiceEngine.speakPhraseWithMode(phrase, 'device', {
         onStart: () => {
           handlePlaybackStart();
         },
@@ -243,7 +247,7 @@ export default function App() {
     return () => {
       talkingTomController.onPhraseFinalized = null;
     };
-  }, [settings.voiceMode, voiceMode, handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
+  }, [handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
 
   // Pause continuous repeat during AI Chat to prevent audio competition (strictly on tab transition)
   useEffect(() => {
@@ -285,6 +289,7 @@ export default function App() {
     talkingTomController.stopListening();
     voiceEngine.cleanup();
     clonedVoiceEngine.cleanup();
+    ayushVoicePack.stopPlayback();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try { window.speechSynthesis.cancel(); } catch {}
     }
@@ -351,6 +356,13 @@ export default function App() {
       const quote = getNextDialogue('kiss');
       showSpeech(quote, 3400);
       scheduleReturnToIdle(3200);
+
+      ayushVoicePack.playActionVoice('kiss', {
+        onAmplitude: (vol) => setTalkingVolume(vol),
+        onEnded: () => setTalkingVolume(0)
+      }).then((played) => {
+        if (!played && settings.soundEnabled) soundManager.playKiss();
+      });
     } else if (actionId === 'hug') {
       if (settings.floatingEffectsEnabled) {
         setHeartBurst((b) => b + 1);
@@ -358,10 +370,24 @@ export default function App() {
       const quote = getNextDialogue('hug');
       showSpeech(quote, 3600);
       scheduleReturnToIdle(3400);
+
+      ayushVoicePack.playActionVoice('hug', {
+        onAmplitude: (vol) => setTalkingVolume(vol),
+        onEnded: () => setTalkingVolume(0)
+      }).then((played) => {
+        if (!played && settings.soundEnabled) soundManager.playHug();
+      });
     } else if (actionId === 'blush') {
       const quote = getNextDialogue('blush');
       showSpeech(quote, 3200);
       scheduleReturnToIdle(3200);
+
+      ayushVoicePack.playActionVoice('blush', {
+        onAmplitude: (vol) => setTalkingVolume(vol),
+        onEnded: () => setTalkingVolume(0)
+      }).then((played) => {
+        if (!played && settings.soundEnabled) soundManager.playBlush();
+      });
     } else if (actionId === 'cuddle') {
       if (settings.floatingEffectsEnabled) {
         setHeartBurst((b) => b + 1);
@@ -369,11 +395,25 @@ export default function App() {
       const quote = getNextDialogue('cuddle');
       showSpeech(quote, 3600);
       scheduleReturnToIdle(3600);
+
+      ayushVoicePack.playActionVoice('cuddle', {
+        onAmplitude: (vol) => setTalkingVolume(vol),
+        onEnded: () => setTalkingVolume(0)
+      }).then((played) => {
+        if (!played && settings.soundEnabled) soundManager.playPurr();
+      });
     } else if (actionId === 'laugh') {
       handleAnnoyanceTap();
       const quote = getNextDialogue('teasing');
       showSpeech(quote, 3200);
       scheduleReturnToIdle(3200);
+
+      ayushVoicePack.playActionVoice('laugh', {
+        onAmplitude: (vol) => setTalkingVolume(vol),
+        onEnded: () => setTalkingVolume(0)
+      }).then((played) => {
+        if (!played && settings.soundEnabled) soundManager.playLaugh();
+      });
     } else if (actionId === 'loveNote') {
       if (settings.floatingEffectsEnabled) {
         setHeartBurst((b) => b + 1);
@@ -381,6 +421,13 @@ export default function App() {
       const quote = getNextDialogue('loveNotes');
       showSpeech(quote, 4000);
       scheduleReturnToIdle(3600);
+
+      ayushVoicePack.playActionVoice('loveNote', {
+        onAmplitude: (vol) => setTalkingVolume(vol),
+        onEnded: () => setTalkingVolume(0)
+      }).then((played) => {
+        if (!played && settings.soundEnabled) soundManager.playSparkle();
+      });
     } else if (actionId === 'boop') {
       showSpeech(getNextDialogue('teasing'), 2800);
       scheduleReturnToIdle(2600);
@@ -398,6 +445,7 @@ export default function App() {
     recordComboAction,
     scheduleReturnToIdle,
     settings.floatingEffectsEnabled,
+    settings.soundEnabled,
     settings.gfName,
     settings.ayushName,
     showSpeech

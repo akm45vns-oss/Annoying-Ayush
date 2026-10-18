@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_SETTINGS, calculateDaysTogether } from '../utils/romanticSettings';
 import { soundManager } from '../utils/audioEffects';
+import { ayushVoicePack, VOICE_ACTIONS } from '../utils/ayushVoicePack';
 
 export default function RomanticSettingsModal({
   isOpen,
@@ -27,6 +28,83 @@ export default function RomanticSettingsModal({
   const [prevSettings, setPrevSettings] = useState(settings);
   const [showSavedNotification, setShowSavedNotification] = useState(false);
   const activeBlobUrlRef = useRef(null);
+
+
+  // Ayush Real Voice Pack local state
+  const [recordingAction, setRecordingAction] = useState(null);
+  const [playingAction, setPlayingAction] = useState(null);
+  const [voicePackRecordings, setVoicePackRecordings] = useState(() => {
+    const map = {};
+    VOICE_ACTIONS.forEach((a) => {
+      map[a.id] = ayushVoicePack.hasCustomVoice(a.id);
+    });
+    return map;
+  });
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  const startVoiceRecording = async (actionId) => {
+    try {
+      soundManager.playPop();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      setRecordingAction(actionId);
+
+      mr.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || 'audio/webm' });
+        await ayushVoicePack.saveActionVoiceBlob(actionId, blob);
+        setVoicePackRecordings((prev) => ({ ...prev, [actionId]: true }));
+        setRecordingAction(null);
+        soundManager.playSparkle();
+      };
+
+      mr.start();
+    } catch (err) {
+      console.warn('Could not record voice note:', err);
+      setRecordingAction(null);
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleAudioUpload = async (actionId, file) => {
+    if (!file) return;
+    try {
+      await ayushVoicePack.saveActionVoiceBlob(actionId, file);
+      setVoicePackRecordings((prev) => ({ ...prev, [actionId]: true }));
+      soundManager.playSparkle();
+    } catch (err) {
+      console.warn('Audio upload failed:', err);
+    }
+  };
+
+  const previewVoiceAction = (actionId) => {
+    soundManager.playPop();
+    setPlayingAction(actionId);
+    ayushVoicePack.playActionVoice(actionId, {
+      onEnded: () => setPlayingAction(null)
+    }).then((played) => {
+      if (!played) setPlayingAction(null);
+    });
+  };
+
+  const deleteVoiceAction = (actionId) => {
+    soundManager.playPop();
+    ayushVoicePack.deleteActionVoice(actionId);
+    setVoicePackRecordings((prev) => ({ ...prev, [actionId]: false }));
+  };
+
 
   // Close modal on Escape key
   useEffect(() => {
@@ -307,59 +385,122 @@ export default function RomanticSettingsModal({
             </p>
           </section>
 
-          {/* 4. Voice & Repeat Style */}
+          {/* 4. Voice Repetition Engine */}
           <section className="settings-section">
             <h3 className="section-label">
-              <Mic size={14} className="label-icon text-purple" />
-              <span>Voice & Repeat Style</span>
+              <Volume2 size={14} className="label-icon text-purple" />
+              <span>Voice Repetition Engine</span>
             </h3>
-            <p className="settings-hint-text">Choose how Ayush repeats your speech:</p>
-            <div className="voice-style-options">
-              <button
-                type="button"
-                className={`voice-style-btn ${formData.voiceMode === 'funny' ? 'active' : ''}`}
-                onClick={() => {
-                  soundManager.playPop();
-                  handleChange('voiceMode', 'funny');
-                }}
-              >
-                <span className="voice-style-emoji">🐿️</span>
-                <div className="voice-style-text">
-                  <span className="voice-style-name">Funny Ayush</span>
-                  <span className="voice-style-desc">Signature cartoon chipmunk pitch</span>
+            <div className="active-voice-engine-banner">
+              <span className="voice-engine-emoji">🇮🇳</span>
+              <div className="voice-engine-details">
+                <div className="voice-engine-title-row">
+                  <span className="voice-engine-title">Free Indian Male Voice Engine</span>
+                  <span className="badge-recorded">✓ Active & Free</span>
                 </div>
-              </button>
-
-              <button
-                type="button"
-                className={`voice-style-btn ${formData.voiceMode === 'device' ? 'active' : ''}`}
-                onClick={() => {
-                  soundManager.playPop();
-                  handleChange('voiceMode', 'device');
-                }}
-              >
-                <span className="voice-style-emoji">🗣️</span>
-                <div className="voice-style-text">
-                  <span className="voice-style-name">Device Voice</span>
-                  <span className="voice-style-desc">Natural browser speech synthesis</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                className={`voice-style-btn ${formData.voiceMode === 'cloned' ? 'active' : ''}`}
-                onClick={() => {
-                  soundManager.playPop();
-                  handleChange('voiceMode', 'cloned');
-                }}
-              >
-                <span className="voice-style-emoji">🎙️</span>
-                <div className="voice-style-text">
-                  <span className="voice-style-name">Cloned Voice</span>
-                  <span className="voice-style-desc">Custom server voice (fallback safe)</span>
-                </div>
-              </button>
+                <p className="voice-engine-desc">
+                  Voice repetition uses high-quality Indian Male speech synthesis (Madhur / Prabhat / Google Indian Male). Zero latency, zero cost, and 100% private offline playback.
+                </p>
+              </div>
             </div>
+          </section>
+
+          {/* 5. Ayush Real Voice Pack (100% Free & Personal) */}
+          <section className="settings-section">
+            <h3 className="section-label">
+              <Mic size={14} className="label-icon text-pink" />
+              <span>Ayush's Real Voice Notes (100% Free)</span>
+            </h3>
+            <p className="settings-hint-text">
+              Record short, affectionate voice messages on your phone! When {formData.gfName || 'she'} taps romantic interactions, your real voice will speak to her:
+            </p>
+
+            <div className="voice-pack-list">
+              {VOICE_ACTIONS.map((action) => {
+                const isRecorded = voicePackRecordings[action.id];
+                const isRecordingThis = recordingAction === action.id;
+                const isPlayingThis = playingAction === action.id;
+
+                return (
+                  <div key={action.id} className="voice-pack-item">
+                    <div className="voice-pack-header">
+                      <div className="voice-pack-title">
+                        <span className="voice-pack-emoji">{action.emoji}</span>
+                        <div>
+                          <strong className="voice-pack-name">{action.label}</strong>
+                          <span className="voice-pack-hint">{action.hint}</span>
+                        </div>
+                      </div>
+                      <div className="voice-pack-status-badge">
+                        {isRecorded ? (
+                          <span className="badge-recorded">✨ Voice Saved</span>
+                        ) : (
+                          <span className="badge-default">Chime / Default</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="voice-pack-actions">
+                      {isRecordingThis ? (
+                        <button
+                          type="button"
+                          className="voice-pack-btn recording"
+                          onClick={stopVoiceRecording}
+                        >
+                          ⏹️ Stop Recording
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="voice-pack-btn"
+                          onClick={() => startVoiceRecording(action.id)}
+                        >
+                          🎙️ {isRecorded ? 'Re-record' : 'Record Voice'}
+                        </button>
+                      )}
+
+                      <label className="voice-pack-btn secondary" title="Upload audio file (mp3/wav/m4a)">
+                        <span>📁 Upload</span>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleAudioUpload(action.id, file);
+                          }}
+                        />
+                      </label>
+
+                      {isRecorded && (
+                        <>
+                          <button
+                            type="button"
+                            className="voice-pack-btn secondary"
+                            onClick={() => previewVoiceAction(action.id)}
+                            disabled={isPlayingThis}
+                          >
+                            {isPlayingThis ? '🔊 Playing...' : '▶️ Test'}
+                          </button>
+                          <button
+                            type="button"
+                            className="voice-pack-btn danger"
+                            onClick={() => deleteVoiceAction(action.id)}
+                            title="Remove custom recording"
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="model-path-note" style={{ marginTop: '8px' }}>
+              💡 <strong>Zero Cost Forever:</strong> Voice notes are saved directly in browser storage on your device. You can also place <code>kiss.mp3</code>, <code>hug.mp3</code>, etc., into <code>public/audio/ayush/</code> in your repository!
+            </p>
           </section>
 
           {/* 4. 3D Avatar Model Section */}

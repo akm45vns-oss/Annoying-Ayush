@@ -68,9 +68,19 @@ export async function handleTtsRequest(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Content-Type', 'application/json');
     if (req.method === 'GET') {
-      const configured = !!((process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID) || process.env.OPENAI_API_KEY);
+      const hasElevenLabs = !!((process.env.ELEVENLABS_API_KEY || '').trim() && (process.env.ELEVENLABS_VOICE_ID || '').trim());
+      const hasOpenAI = !!(process.env.OPENAI_API_KEY || '').trim();
+      const configured = hasElevenLabs || hasOpenAI;
       res.statusCode = 200;
-      res.end(JSON.stringify({ ok: true, status: 'ready', configured }));
+      res.end(JSON.stringify({
+        ok: true,
+        status: 'ready',
+        configured,
+        hasElevenLabs,
+        hasOpenAI,
+        voiceProvider: hasElevenLabs ? 'elevenlabs' : (hasOpenAI ? 'openai' : 'none'),
+        modelId: hasElevenLabs ? ((process.env.ELEVENLABS_MODEL_ID || '').trim() || 'eleven_multilingual_v2') : null
+      }));
       return;
     }
     res.statusCode = 405;
@@ -101,9 +111,9 @@ export async function handleTtsRequest(req, res) {
 
   const text = body.text.trim().slice(0, 400); // Sensible limit per spoken utterance
 
-  const elevenKey = process.env.ELEVENLABS_API_KEY;
-  const elevenVoiceId = process.env.ELEVENLABS_VOICE_ID;
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const elevenKey = (process.env.ELEVENLABS_API_KEY || '').trim();
+  const elevenVoiceId = (process.env.ELEVENLABS_VOICE_ID || '').trim();
+  const openaiKey = (process.env.OPENAI_API_KEY || '').trim();
 
   // Unconfigured state: Gracefully let client know to use browser synthesis fallback
   if ((!elevenKey || !elevenVoiceId) && !openaiKey) {
@@ -222,6 +232,7 @@ export async function handleTtsRequest(req, res) {
   res.end(JSON.stringify({
     ok: false,
     configured: true,
+    providerError: true,
     error: 'Voice service unavailable. Using browser fallback voice.',
     text
   }));

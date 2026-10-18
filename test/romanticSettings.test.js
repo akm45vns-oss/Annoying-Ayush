@@ -41,7 +41,7 @@ describe('Romantic Settings & Model URL Sanitization', () => {
     assert.equal(DEFAULT_SETTINGS.anniversaryDate, '2025-07-21');
     assert.equal(DEFAULT_SETTINGS.soundEnabled, true);
     assert.equal(DEFAULT_SETTINGS.customModelUrl, '');
-    assert.equal(DEFAULT_SETTINGS.voiceMode, 'funny');
+    assert.equal(DEFAULT_SETTINGS.voiceMode, 'device');
 
     // Validate default unlock state
     assert.equal(DEFAULT_UNLOCKS.secretHeartUnlocked, false);
@@ -149,10 +149,10 @@ describe('Romantic Settings & Model URL Sanitization', () => {
       let loaded = loadRomanticSettings();
       assert.equal(loaded.voiceMode, 'cloned');
 
-      // Normalizes invalid voiceMode to default 'funny'
+      // Normalizes invalid voiceMode to default 'device'
       saveRomanticSettings({ ...DEFAULT_SETTINGS, voiceMode: 'invalid_mode_unknown' });
       loaded = loadRomanticSettings();
-      assert.equal(loaded.voiceMode, 'funny');
+      assert.equal(loaded.voiceMode, 'device');
     });
 
     it('handles malformed JSON in localStorage gracefully without throwing', () => {

@@ -183,6 +183,147 @@ describe('Voice Modes & Interaction Preservation', () => {
       assert.equal(clonedVoiceEngine.activeUtterance, null, 'Active utterance reference must be released after completion');
       assert.equal(clonedVoiceEngine.watchdogTimer, null, 'Watchdog timer must be cleared after completion');
     });
+
+    it('plays cloned voice audio via Web Audio and triggers callbacks when server returns binary MP3', async () => {
+      const originalFetch = globalThis.fetch;
+      let onStartCalled = false;
+      let onEndedCalled = false;
+      let amplitudeSamples = [];
+
+      // Mock Web Audio Context
+      let sourceStarted = false;
+      const mockBuffer = { duration: 1.5 };
+      class MockBufferSource {
+        constructor() {
+          this.playbackRate = { setValueAtTime() {} };
+          this.buffer = null;
+          this.onended = null;
+        }
+        connect() {}
+        start() {
+          sourceStarted = true;
+          // Trigger onended shortly after
+          setTimeout(() => {
+            if (this.onended) this.onended();
+          }, 20);
+        }
+        stop() {}
+        disconnect() {}
+      }
+
+      globalThis.window.AudioContext = class MockAudioContext {
+        constructor() {
+          this.state = 'running';
+          this.currentTime = 0;
+          this.destination = {};
+        }
+        async resume() {}
+        createBufferSource() { return new MockBufferSource(); }
+        createAnalyser() {
+          return {
+            fftSize: 128,
+            smoothingTimeConstant: 0.5,
+            frequencyBinCount: 64,
+            getByteFrequencyData(arr) { arr.fill(80); },
+            connect() {}
+          };
+        }
+        createDynamicsCompressor() {
+          return {
+            threshold: { setValueAtTime() {} },
+            knee: { setValueAtTime() {} },
+            ratio: { setValueAtTime() {} },
+            attack: { setValueAtTime() {} },
+            release: { setValueAtTime() {} },
+            connect() {}
+          };
+        }
+        createGain() {
+          return {
+            gain: { setValueAtTime() {} },
+            connect() {}
+          };
+        }
+        createBiquadFilter() {
+          return {
+            type: '',
+            frequency: { setValueAtTime() {} },
+            Q: { setValueAtTime() {} },
+            gain: { setValueAtTime() {} },
+            connect() {}
+          };
+        }
+        async decodeAudioData() {
+          return mockBuffer;
+        }
+      };
+
+      globalThis.fetch = async () => ({
+        ok: true,
+        headers: { get: () => 'audio/mpeg' },
+        arrayBuffer: async () => new ArrayBuffer(256)
+      });
+
+      clonedVoiceEngine.cleanup();
+      clonedVoiceEngine.audioCtx = new globalThis.window.AudioContext();
+
+      try {
+        await new Promise((resolve) => {
+          clonedVoiceEngine.speakPhraseWithMode('Hello darling in cloned voice', 'cloned', {
+            onStart: () => { onStartCalled = true; },
+            onAmplitude: (vol) => { amplitudeSamples.push(vol); },
+            onEnded: () => {
+              onEndedCalled = true;
+              resolve();
+            }
+          });
+        });
+
+        assert.equal(onStartCalled, true);
+        assert.equal(sourceStarted, true, 'AudioBufferSourceNode must be started for cloned playback');
+        assert.equal(onEndedCalled, true, 'onEnded must be invoked when cloned speech finishes');
+      } finally {
+        globalThis.fetch = originalFetch;
+        delete globalThis.window.AudioContext;
+      }
+    });
+
+    it('falls back to device speech with "provider_error" reason when server reports providerError', async () => {
+      const originalFetch = globalThis.fetch;
+      let reportedReason = null;
+      let ended = false;
+
+      globalThis.fetch = async () => ({
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => ({
+          ok: false,
+          configured: true,
+          providerError: true,
+          error: 'Voice service unavailable. Using browser fallback voice.'
+        })
+      });
+
+      try {
+        await new Promise((resolve) => {
+          clonedVoiceEngine.speakPhraseWithMode('Romantic whisper', 'cloned', {
+            onFallback: (reason) => { reportedReason = reason; },
+            onEnded: () => {
+              ended = true;
+              resolve();
+            }
+          });
+        });
+
+        assert.equal(reportedReason, 'provider_error');
+        assert.equal(ended, true);
+        assert.equal(synthUtterances.length, 1);
+        assert.equal(synthUtterances[0].text, 'Romantic whisper');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
   });
 });
+
 
