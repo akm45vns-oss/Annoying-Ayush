@@ -18,7 +18,7 @@ const ACTIVITIES_LIST = [
     desc: 'Rapid tap popping targets before the clock runs out!',
     icon: '🎯',
     color: '#ff4081',
-    reward: 'Up to 60 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'memory_match',
@@ -26,7 +26,7 @@ const ACTIVITIES_LIST = [
     desc: 'Match adorable pairs of cute companion emojis.',
     icon: '🧠',
     color: '#7c4dff',
-    reward: 'Up to 50 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'reaction_test',
@@ -34,7 +34,7 @@ const ACTIVITIES_LIST = [
     desc: 'Test your lightning reflexes when Ayush signals green!',
     icon: '⚡',
     color: '#00e676',
-    reward: 'Up to 45 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'dance_copy',
@@ -42,7 +42,7 @@ const ACTIVITIES_LIST = [
     desc: 'Repeat Ayush’s groovy dance sequence in rhythm!',
     icon: '🕺',
     color: '#e040fb',
-    reward: 'Up to 50 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'bubble_pop',
@@ -50,7 +50,7 @@ const ACTIVITIES_LIST = [
     desc: 'Pop floating rainbow bubbles drifting through the room.',
     icon: '🫧',
     color: '#00b0ff',
-    reward: 'Up to 55 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'rps',
@@ -58,7 +58,7 @@ const ACTIVITIES_LIST = [
     desc: 'Play the timeless duel of hands with Ayush!',
     icon: '✌️',
     color: '#ff9100',
-    reward: 'Up to 40 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'guess_sound',
@@ -66,7 +66,7 @@ const ACTIVITIES_LIST = [
     desc: 'Listen closely and guess what sound Ayush just made!',
     icon: '🎵',
     color: '#ff007f',
-    reward: 'Up to 50 Coins'
+    reward: '💖 Affection & XP'
   },
   {
     id: 'quick_quiz',
@@ -74,7 +74,7 @@ const ACTIVITIES_LIST = [
     desc: 'Fun couple trivia and questions about your companion!',
     icon: '❓',
     color: '#26c6da',
-    reward: 'Up to 50 Coins'
+    reward: '💖 Affection & XP'
   }
 ];
 
@@ -95,9 +95,9 @@ export default function ActivityHub({
     setActiveGameId(gameId);
   };
 
-  const handleFinishGame = (score, coins) => {
+  const handleFinishGame = (score) => {
     soundManager.playFanfare();
-    const { updated } = recordMiniGameCompleted(progression, score, coins);
+    const { updated } = recordMiniGameCompleted(progression, score);
     onUpdateProgression(updated);
     setActiveGameId(null);
   };

@@ -47,8 +47,7 @@ export default function MemoryMatchGame({ onFinish, onClose, gfName = 'Babe' }) 
   };
 
   const handleClaim = () => {
-    const bonusCoins = Math.max(25, 60 - moves * 2);
-    onFinish(100, bonusCoins);
+    onFinish(100);
   };
 
   return (
@@ -101,9 +100,8 @@ export default function MemoryMatchGame({ onFinish, onClose, gfName = 'Babe' }) 
             <h3 className="summary-title">Matched in {moves} Moves!</h3>
             <p className="summary-score">Brilliant memory, {gfName}! Ayush is impressed. 💕</p>
             <div className="summary-rewards">
-              <span>🪙 +{Math.max(25, 60 - moves * 2)} Coins</span>
+              <span>💖 +10% Affection</span>
               <span>⭐ +50 XP</span>
-              <span>💖 +5% Affection</span>
             </div>
             <button 
               type="button" 
@@ -111,7 +109,7 @@ export default function MemoryMatchGame({ onFinish, onClose, gfName = 'Babe' }) 
               onClick={handleClaim}
             >
               <Sparkles size={18} />
-              <span>Claim Rewards & Return</span>
+              <span>Great Job! Continue</span>
             </button>
           </div>
         )}

@@ -2,10 +2,11 @@
 
 > **Verified against actual source code**  
 > **Date**: October 2026  
-> **Test Suite**: 108 / 108 Tests Passing (`node:test`)  
+> **Test Suite**: 114 / 114 Tests Passing (`node:test`)  
 > **Linter**: 0 Errors, 0 Warnings (`oxlint`)  
-> **Production Build**: Built in 463ms with modular code splitting (`dist/assets/index-*.js`: 398 KB, gzip: 113 KB)  
-> **Git**: Branch `main`, all changes verified locally (never pushed without authorization)
+> **Production Build**: Built cleanly with modular code splitting (`dist/assets/index-*.js`, gzip: 113 KB)  
+> **Git**: Branch `main`, all changes verified locally (never pushed without authorization)  
+> **Core Principle**: 100% Free Virtual Companion — zero currency, zero micro-transactions, zero locks, all items & features immediately accessible.
 
 ---
 
@@ -23,7 +24,7 @@
 |:--------|:------:|:-----------------------|
 | Portrait-first layout | ✅ Working | `index.css` mobile-first, `100dvh`, safe-area insets (`env(safe-area-inset-*)`) |
 | 3D character occupies screen (83%) | ✅ Working | Camera at `[0, 0.38, 3.24]`, FOV 44, 83% framing ratio verified by mathematical bounds test |
-| Top bar with player progression | ✅ Working | `Header.jsx` displays Level badge (`Lv.X`), Coin balance (`🪙 X`), and Daily Reward gift indicator |
+| Top bar with player progression | ✅ Working | `Header.jsx` displays Level badge (`Lv.X`), Days Together counter, Settings icon, and Daily Reward gift indicator |
 | Top bar Settings & Info icons | ✅ Working | `Header.jsx` settings gear (opens `RomanticSettingsModal`), info letter dialog |
 | "Days Together" / Anniversary counter | ✅ Working | `Header.jsx` displays real-time calculated days together from anniversary date |
 | Two dominant home actions | ✅ Working | Strictly 2 primary tabs in `InteractionMenu.jsx`: **`Play & Romance 💖`** and **`AI Chat 💬`** |
@@ -150,7 +151,7 @@
 | 6. Rock-Paper-Scissors | ✅ Working | `RockPaperScissorsGame.jsx`: Interactive duel of hands against Ayush |
 | 7. Guess the Sound | ✅ Working | `GuessTheSoundGame.jsx`: Listen to synthesized Web Audio sound and pick matching action |
 | 8. Quick Quiz | ✅ Working | `QuickQuizGame.jsx`: 5-question multiple choice companion & couple romance trivia |
-| Activity Hub Sheet | ✅ Working | `ActivityHub.jsx`: Lists all 8 playable games with coin rewards, instructions, exit/pause controls |
+| Activity Hub Sheet | ✅ Working | `ActivityHub.jsx`: Lists all 8 playable games with affection & XP rewards, instructions, exit controls |
 
 ---
 
@@ -161,8 +162,8 @@
 | Wardrobe Panel Sheet | ✅ Working | `WardrobePanel.jsx`: Tabbed catalog (Hats & Hair, Glasses, Outfits, Accessories) |
 | Data-Driven Catalog | ✅ Working | `wardrobeData.js`: Hats (Crown, Blossom, Party, Cap, Beanie), Glasses (Heart, Wayfarer), Outfits, Accessories |
 | 3D Accessory Rendering | ✅ Working | `WardrobeAccessories3D.jsx`: Procedural 3D models of hats, heart sunglasses, wings, bowties rendered dynamically on character |
-| Equip / Unequip Mechanics | ✅ Working | Saves equipped items in `progression.wardrobe.equipped` |
-| Economy & Purchasing | ✅ Working | Items cost in-game coins; unowned items show coin price; owned items show equip button |
+| Equip / Unequip Mechanics | ✅ Working | Saves equipped items in `progression.wardrobe.equipped`; one-tap wear & swap |
+| 100% Free Access | ✅ Working | Zero currency or purchase locks; all items available and previewable immediately from first launch |
 
 ---
 
@@ -170,7 +171,7 @@
 
 | Feature | Status | Implementation Details |
 |:--------|:------:|:-----------------------|
-| Room Themes | ✅ Working | `roomSettings.js` & `RoomPanel.jsx`: Studio, Sunset, Night Sky, Rose Garden |
+| Room Themes | ✅ Working | `roomSettings.js` & `RoomPanel.jsx`: Studio, Sunset, Night Sky, Rose Garden — 100% unlocked from start |
 | 3D Room Environment | ✅ Working | `RoomEnvironment.jsx`: Curved wall plane, hardwood/pastel floor, baseboards, picture frames, floating shelf, sunset window |
 | Dynamic Lighting Presets | ✅ Working | Day, Sunset, and Night lighting presets adjusting ambient, directional sun, rim, and bounce lights |
 
@@ -180,9 +181,9 @@
 
 | Feature | Status | Implementation Details |
 |:--------|:------:|:-----------------------|
-| Player Level & Experience | ✅ Working | Level formula `getXpRequiredForLevel(level) = level * 100` with level-up coin bonus |
-| Coin Economy | ✅ Working | Earned through mini-games, touch interactions, daily rewards; spent in Wardrobe and Room |
-| Daily Reward Modal | ✅ Working | `DailyRewardModal.jsx`: 24-hour non-punitive daily claim bonus awarding coins, XP, and affection |
+| Player Level & Experience | ✅ Working | Level formula `getXpRequiredForLevel(level) = level * 100`; purely cosmetic/informational progression |
+| Currency Removal | ✅ Working | Coins permanently removed; no artificial paywalls or progress gating anywhere in the game |
+| Daily Reward Modal | ✅ Working | `DailyRewardModal.jsx`: 24-hour non-punitive daily claim bonus awarding XP and affection boost |
 | Achievements Tracking | ✅ Working | 9 achievements (First Chat, Voice Repeat, Touch 10/50, Mini-Game Champ, Fashionista, Soulmates, Streak) |
 | Profile & Emotes Panel | ✅ Working | `ProfilePanel.jsx`: Displays player stats, achievement progress, and clickable emote triggers |
 

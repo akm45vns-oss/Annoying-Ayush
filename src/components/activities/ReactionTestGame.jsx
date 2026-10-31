@@ -48,8 +48,7 @@ export default function ReactionTestGame({ onFinish, onClose, gfName = 'Babe' })
   };
 
   const handleClaim = () => {
-    const coins = Math.max(20, Math.floor(600 / Math.max(1, reactionTime / 100)));
-    onFinish(100, coins);
+    onFinish(100);
   };
 
   return (
@@ -115,7 +114,7 @@ export default function ReactionTestGame({ onFinish, onClose, gfName = 'Babe' })
                 {reactionTime < 280 ? 'Lightning reflexes! ⚡' : 'Great timing! 💕'}
               </p>
               <div className="summary-rewards">
-                <span>🪙 +{Math.max(20, Math.floor(600 / Math.max(1, reactionTime / 100)))} Coins</span>
+                <span>💖 +10% Affection</span>
                 <span>⭐ +40 XP</span>
               </div>
               <button 
@@ -124,7 +123,7 @@ export default function ReactionTestGame({ onFinish, onClose, gfName = 'Babe' })
                 onClick={handleClaim}
               >
                 <Sparkles size={18} />
-                <span>Claim & Return</span>
+                <span>Great Job! Continue</span>
               </button>
             </div>
           )}

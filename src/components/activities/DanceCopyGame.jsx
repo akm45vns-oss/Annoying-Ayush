@@ -66,8 +66,7 @@ export default function DanceCopyGame({ onFinish, onClose, gfName = 'Babe', ayus
   };
 
   const handleClaim = () => {
-    const coins = Math.max(20, round * 12);
-    onFinish(round * 20, coins);
+    onFinish(round * 20);
   };
 
   return (
@@ -122,7 +121,7 @@ export default function DanceCopyGame({ onFinish, onClose, gfName = 'Babe', ayus
             <h3 className="summary-title">Awesome Dancing!</h3>
             <p className="summary-score">You reached Round {round}, {gfName}! ✨</p>
             <div className="summary-rewards">
-              <span>🪙 +{Math.max(20, round * 12)} Coins</span>
+              <span>💖 +10% Affection</span>
               <span>⭐ +{round * 20} XP</span>
             </div>
             <button 
@@ -130,8 +129,8 @@ export default function DanceCopyGame({ onFinish, onClose, gfName = 'Babe', ayus
               className="claim-reward-btn"
               onClick={handleClaim}
             >
-              <Sparkles size={16} />
-              <span>Claim & Return</span>
+              <Sparkles size={18} />
+              <span>Great Job! Continue</span>
             </button>
           </div>
         )}

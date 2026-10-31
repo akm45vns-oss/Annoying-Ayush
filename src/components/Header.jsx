@@ -12,7 +12,6 @@ export default function Header({
   isListening = false,
   onToggleListening = () => {},
   level = 1,
-  coins = 120,
   isDailyClaimable = false,
   onOpenDailyReward = () => {},
   onOpenProfile = () => {}
@@ -93,18 +92,6 @@ export default function Header({
             <span className="daily-gift-emoji">🎁</span>
             {isDailyClaimable && <span className="daily-sparkle-dot" />}
           </button>
-
-          {/* Coins Pill */}
-          <div
-            className="header-coin-pill"
-            onClick={onOpenProfile}
-            title={`${coins} Coins`}
-            role="button"
-            tabIndex={0}
-          >
-            <span className="coin-emoji">🪙</span>
-            <span className="coin-num">{coins}</span>
-          </div>
 
           {/* Level Badge */}
           <div

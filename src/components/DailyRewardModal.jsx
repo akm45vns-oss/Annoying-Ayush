@@ -57,19 +57,14 @@ export default function DailyRewardModal({
 
         <div className="daily-prizes-preview">
           <div className="prize-box">
-            <span className="prize-emoji">🪙</span>
-            <span className="prize-amount">+{80 + Math.min(100, streak * 10)}</span>
-            <span className="prize-label">Coins</span>
-          </div>
-          <div className="prize-box">
-            <span className="prize-emoji">⭐</span>
-            <span className="prize-amount">+50</span>
-            <span className="prize-label">XP</span>
-          </div>
-          <div className="prize-box">
             <span className="prize-emoji">💖</span>
             <span className="prize-amount">+10%</span>
             <span className="prize-label">Affection</span>
+          </div>
+          <div className="prize-box">
+            <span className="prize-emoji">⭐</span>
+            <span className="prize-amount">+60</span>
+            <span className="prize-label">XP Boost</span>
           </div>
         </div>
 

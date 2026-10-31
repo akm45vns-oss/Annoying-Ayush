@@ -46,8 +46,7 @@ export default function RockPaperScissorsGame({ onFinish, onClose, gfName = 'Bab
   };
 
   const handleClaim = () => {
-    const coins = 20 + playerWins * 15;
-    onFinish(playerWins * 25, coins);
+    onFinish(playerWins * 25);
   };
 
   return (
@@ -130,7 +129,7 @@ export default function RockPaperScissorsGame({ onFinish, onClose, gfName = 'Bab
                 onClick={handleClaim}
               >
                 <Sparkles size={16} />
-                <span>Finish & Claim Coins</span>
+                <span>Finish & Continue</span>
               </button>
             </div>
           </div>

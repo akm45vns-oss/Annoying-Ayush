@@ -55,7 +55,7 @@ export default function WardrobePanel({
         <div className="sheet-header">
           <div className="sheet-title-group">
             <h2 className="sheet-title">Ayush's Wardrobe 👗</h2>
-            <div className="sheet-coin-badge free-badge">
+            <div className="sheet-free-badge">
               <Sparkles size={13} />
               <span>100% Free & Unlocked</span>
             </div>

@@ -84,8 +84,7 @@ export default function GuessTheSoundGame({ onFinish, onClose, gfName = 'Babe' }
   };
 
   const handleClaim = () => {
-    const coins = Math.max(15, Math.floor(score * 1.25));
-    onFinish(score, coins);
+    onFinish(score);
   };
 
   return (
@@ -163,9 +162,8 @@ export default function GuessTheSoundGame({ onFinish, onClose, gfName = 'Babe' }
             <h3 className="summary-title">Game Finished, {gfName}!</h3>
             <p className="summary-score">Final Score: <strong>{score}</strong> / 100 pts</p>
             <div className="summary-rewards">
-              <span>🪙 +{Math.max(15, Math.floor(score * 1.25))} Coins</span>
+              <span>💖 +10% Affection</span>
               <span>⭐ +{30 + Math.floor(score / 5)} XP</span>
-              <span>💖 +5% Affection</span>
             </div>
             <button 
               type="button" 
@@ -173,7 +171,7 @@ export default function GuessTheSoundGame({ onFinish, onClose, gfName = 'Babe' }
               onClick={handleClaim}
             >
               <Sparkles size={18} />
-              <span>Claim Rewards & Return</span>
+              <span>Great Job! Continue</span>
             </button>
           </div>
         )}

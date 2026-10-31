@@ -50,8 +50,7 @@ export default function BubblePopGame({ onFinish, onClose, gfName = 'Babe' }) {
   };
 
   const handleClaim = () => {
-    const coins = Math.max(15, poppedCount * 3);
-    onFinish(poppedCount * 10, coins);
+    onFinish(poppedCount * 10);
   };
 
   return (
@@ -111,7 +110,7 @@ export default function BubblePopGame({ onFinish, onClose, gfName = 'Babe' }) {
             <h3 className="summary-title">{poppedCount} Bubbles Popped!</h3>
             <p className="summary-score">Awesome popping frenzy, {gfName}! 💖</p>
             <div className="summary-rewards">
-              <span>🪙 +{Math.max(15, poppedCount * 3)} Coins</span>
+              <span>💖 +10% Affection</span>
               <span>⭐ +{30 + poppedCount * 2} XP</span>
             </div>
             <button 
@@ -120,7 +119,7 @@ export default function BubblePopGame({ onFinish, onClose, gfName = 'Babe' }) {
               onClick={handleClaim}
             >
               <Sparkles size={18} />
-              <span>Claim Rewards & Return</span>
+              <span>Great Job! Continue</span>
             </button>
           </div>
         )}

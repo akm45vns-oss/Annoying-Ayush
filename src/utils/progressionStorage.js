@@ -14,7 +14,6 @@ export const INITIAL_PROGRESSION = {
   version: 1,
   level: 1,
   xp: 0,
-  coins: 120, // Starter bonus for new players
   affection: 20, // 0 to 100%
   streak: 1,
   lastDailyClaim: null, // ISO string or null
@@ -107,7 +106,6 @@ export function loadProgression() {
       version: 1,
       level: Math.max(1, Number(parsed.level) || 1),
       xp: Math.max(0, Number(parsed.xp) || 0),
-      coins: Math.max(0, Number(parsed.coins) || 0),
       affection: Math.min(100, Math.max(0, Number(parsed.affection) || 0)),
       streak: Math.max(1, Number(parsed.streak) || 1),
       lastDailyClaim: parsed.lastDailyClaim || null,
@@ -156,10 +154,10 @@ export function saveProgression(data) {
 }
 
 /**
- * Adds XP, computing level-ups and granting bonus coins on level up
+ * Adds XP, computing level-ups
  */
 export function addXpToProgression(current, amount) {
-  let { level, xp, coins } = current;
+  let { level, xp } = current;
   let remainingXp = xp + Math.max(0, amount);
   let leveledUp = false;
   let levelsGained = 0;
@@ -169,7 +167,6 @@ export function addXpToProgression(current, amount) {
     remainingXp -= needed;
     level += 1;
     levelsGained += 1;
-    coins += 50; // Bonus 50 coins per level
     leveledUp = true;
     needed = getXpRequiredForLevel(level);
   }
@@ -177,36 +174,24 @@ export function addXpToProgression(current, amount) {
   const updated = {
     ...current,
     level,
-    xp: remainingXp,
-    coins
+    xp: remainingXp
   };
   saveProgression(updated);
   return { updated, leveledUp, levelsGained };
 }
 
 /**
- * Adds coins to balance
+ * Legacy compatibility: Currency is permanently removed, returns current state safely
  */
-export function addCoinsToProgression(current, amount) {
-  const updated = {
-    ...current,
-    coins: Math.max(0, current.coins + amount)
-  };
-  saveProgression(updated);
-  return updated;
+export function addCoinsToProgression(current) {
+  return current;
 }
 
 /**
- * Deducts coins if sufficient balance exists
+ * Legacy compatibility: All items/features are 100% free, always succeeds
  */
-export function spendCoinsFromProgression(current, amount) {
-  if (current.coins < amount) return { success: false, updated: current };
-  const updated = {
-    ...current,
-    coins: current.coins - amount
-  };
-  saveProgression(updated);
-  return { success: true, updated };
+export function spendCoinsFromProgression(current) {
+  return { success: true, updated: current };
 }
 
 /**
@@ -278,9 +263,8 @@ export function claimDailyReward(current) {
     }
   }
 
-  const bonusCoins = 80 + Math.min(100, streak * 10);
   const bonusAffection = 10;
-  const xpReward = 50;
+  const xpReward = 60;
 
   let achievements = { ...current.achievements };
   if (streak >= 3 && !achievements.daily_streak_3?.unlocked) {
@@ -294,7 +278,6 @@ export function claimDailyReward(current) {
   const updatedWithXp = addXpToProgression(current, xpReward).updated;
   const updated = {
     ...updatedWithXp,
-    coins: updatedWithXp.coins + bonusCoins,
     affection: Math.min(100, updatedWithXp.affection + bonusAffection),
     streak,
     lastDailyClaim: now.toISOString(),
@@ -305,11 +288,10 @@ export function claimDailyReward(current) {
 
   return {
     success: true,
-    coins: bonusCoins,
     affection: bonusAffection,
     xp: xpReward,
     streak,
-    message: `Claimed! +${bonusCoins} coins, +${bonusAffection}% affection, +${xpReward} XP! 🎉`,
+    message: `Claimed! +${bonusAffection}% affection, +${xpReward} XP! 🎉`,
     updated
   };
 }
@@ -336,11 +318,10 @@ export function recordInteraction(current) {
     };
   }
 
-  // Small XP & coins reward for interaction
+  // XP reward for interaction
   const updatedWithXp = addXpToProgression(current, 5).updated;
   const updated = {
     ...updatedWithXp,
-    coins: updatedWithXp.coins + 2,
     totalInteractions: nextCount,
     achievements
   };
@@ -351,7 +332,7 @@ export function recordInteraction(current) {
 /**
  * Records a completed mini game
  */
-export function recordMiniGameCompleted(current, score = 0, bonusCoins = 30) {
+export function recordMiniGameCompleted(current, score = 0) {
   const nextGames = (current.totalMiniGamesPlayed || 0) + 1;
   let achievements = { ...current.achievements };
 
@@ -371,18 +352,16 @@ export function recordMiniGameCompleted(current, score = 0, bonusCoins = 30) {
   }
 
   const xpReward = 35 + Math.floor(score / 10);
-  const totalCoins = Math.max(10, bonusCoins);
 
   const updatedWithXp = addXpToProgression(current, xpReward).updated;
   const updated = {
     ...updatedWithXp,
-    coins: updatedWithXp.coins + totalCoins,
     affection: Math.min(100, updatedWithXp.affection + 5),
     totalMiniGamesPlayed: nextGames,
     achievements
   };
   saveProgression(updated);
-  return { updated, coinsEarned: totalCoins, xpEarned: xpReward };
+  return { updated, xpEarned: xpReward };
 }
 
 /**

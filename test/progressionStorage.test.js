@@ -6,7 +6,6 @@ import {
   loadProgression,
   saveProgression,
   addXpToProgression,
-  addCoinsToProgression,
   spendCoinsFromProgression,
   addAffectionToProgression,
   canClaimDailyReward,
@@ -27,7 +26,7 @@ globalThis.window = {
   }
 };
 
-describe('Progression Storage & Economy System', () => {
+describe('Progression Storage & Free Companion System', () => {
   beforeEach(() => {
     mockStorage.clear();
   });
@@ -36,7 +35,6 @@ describe('Progression Storage & Economy System', () => {
     const data = loadProgression();
     assert.equal(data.level, 1);
     assert.equal(data.xp, 0);
-    assert.equal(data.coins, 120);
     assert.equal(data.affection, 20);
     assert.equal(data.streak, 1);
     assert.equal(data.lastDailyClaim, null);
@@ -50,7 +48,7 @@ describe('Progression Storage & Economy System', () => {
     assert.equal(getXpRequiredForLevel(5), 500);
   });
 
-  it('adds XP and calculates level-ups with coin bonuses', () => {
+  it('adds XP and calculates level-ups without currency locks', () => {
     const initial = loadProgression();
     // Add 150 XP (needed for lvl 1 is 100) -> should level up to level 2 with 50 XP remainder
     const { updated, leveledUp, levelsGained } = addXpToProgression(initial, 150);
@@ -58,28 +56,18 @@ describe('Progression Storage & Economy System', () => {
     assert.equal(levelsGained, 1);
     assert.equal(updated.level, 2);
     assert.equal(updated.xp, 50);
-    assert.equal(updated.coins, 120 + 50); // bonus 50 coins
   });
 
-  it('adds and spends coins correctly', () => {
+  it('guarantees legacy spend coins returns success because all features are free', () => {
     const initial = loadProgression();
-    const withCoins = addCoinsToProgression(initial, 50);
-    assert.equal(withCoins.coins, 170);
-
-    const spendSuccess = spendCoinsFromProgression(withCoins, 70);
+    const spendSuccess = spendCoinsFromProgression(initial, 100);
     assert.equal(spendSuccess.success, true);
-    assert.equal(spendSuccess.updated.coins, 100);
-
-    const spendFail = spendCoinsFromProgression(spendSuccess.updated, 500);
-    assert.equal(spendFail.success, false);
-    assert.equal(spendFail.updated.coins, 100);
   });
 
   it('saves and loads progression to and from storage', () => {
-    const custom = { ...INITIAL_PROGRESSION, coins: 888, level: 3 };
+    const custom = { ...INITIAL_PROGRESSION, level: 3 };
     saveProgression(custom);
     const loaded = loadProgression();
-    assert.equal(loaded.coins, 888);
     assert.equal(loaded.level, 3);
   });
 
@@ -104,7 +92,7 @@ describe('Progression Storage & Economy System', () => {
     const initial = loadProgression();
     const result = claimDailyReward(initial);
     assert.equal(result.success, true);
-    assert.ok(result.coins >= 80);
+    assert.equal(result.affection, 10);
     assert.ok(result.message.includes('Claimed!'));
     assert.ok(result.updated.lastDailyClaim !== null);
 
@@ -124,18 +112,15 @@ describe('Progression Storage & Economy System', () => {
 
   it('records mini game completion with rewards and achievement progress', () => {
     const initial = loadProgression();
-    const { updated, coinsEarned, xpEarned } = recordMiniGameCompleted(initial, 100, 40);
+    const { updated, xpEarned } = recordMiniGameCompleted(initial, 100);
     assert.equal(updated.totalMiniGamesPlayed, 1);
     assert.equal(updated.achievements.first_game.unlocked, true);
-    assert.equal(coinsEarned, 40);
     assert.ok(xpEarned >= 35);
   });
 
   it('resets progression cleanly', () => {
-    const initial = loadProgression();
-    addCoinsToProgression(initial, 999);
     const reset = resetProgression();
-    assert.equal(reset.coins, INITIAL_PROGRESSION.coins);
     assert.equal(reset.level, 1);
+    assert.equal(reset.xp, 0);
   });
 });

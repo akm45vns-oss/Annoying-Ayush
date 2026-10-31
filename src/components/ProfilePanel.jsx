@@ -27,7 +27,14 @@ export default function ProfilePanel({
 }) {
   if (!isOpen) return null;
 
-  const { level = 1, xp = 0, coins = 0, affection = 20, streak = 1, achievements = {} } = progression;
+  const {
+    level = 1,
+    xp = 0,
+    affection = 20,
+    streak = 1,
+    totalMiniGamesPlayed = 0,
+    achievements = {}
+  } = progression;
   const xpNeeded = getXpRequiredForLevel(level);
   const xpPercent = Math.min(100, Math.floor((xp / xpNeeded) * 100));
 
@@ -102,8 +109,8 @@ export default function ProfilePanel({
 
           <div className="profile-stat-pill-row">
             <div className="pill-item">
-              <span className="pill-emoji">🪙</span>
-              <span className="pill-val">{coins} Coins</span>
+              <span className="pill-emoji">🎮</span>
+              <span className="pill-val">{totalMiniGamesPlayed} Games</span>
             </div>
             <div className="pill-item">
               <span className="pill-emoji">🔥</span>

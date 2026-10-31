@@ -757,7 +757,6 @@ export default function App() {
           isListening={isListening}
           onToggleListening={handleToggleListening}
           level={progression.level}
-          coins={progression.coins}
           isDailyClaimable={canClaimDailyReward(progression.lastDailyClaim)}
           onOpenDailyReward={() => setIsDailyRewardOpen(true)}
           onOpenProfile={() => setActiveNav('profile')}
