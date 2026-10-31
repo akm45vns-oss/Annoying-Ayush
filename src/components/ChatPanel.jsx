@@ -7,11 +7,25 @@ import {
   RotateCcw, 
   AlertCircle,
   Bot,
-  Heart
+  Heart,
+  Mic,
+  Volume2,
+  VolumeX,
+  Square
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 import { generateOfflineFallback, detectCharacterReaction } from '../utils/aiPersonality';
 import { loadChatHistory, saveChatHistory, clearChatHistory } from '../utils/chatStorage';
+import { clonedVoiceEngine } from '../utils/clonedVoiceEngine';
+
+const createChatMsg = (idPrefix, sender, text, isOffline = false, provider = undefined) => ({
+  id: `${idPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  sender,
+  text,
+  timestamp: Date.now(),
+  isOfflineFallback: isOffline,
+  ...(provider ? { provider } : {})
+});
 
 export default function ChatPanel({
   isOpen,
@@ -25,13 +39,7 @@ export default function ChatPanel({
     if (saved && saved.length > 0) return saved;
     // Friendly initial welcome message
     return [
-      {
-        id: 'welcome-1',
-        sender: 'ayush',
-        text: `Hey ${gfName}! ❤️ Type anything to me—ask me what I'm doing, tease me, or send me some love!`,
-        timestamp: Date.now(),
-        isOfflineFallback: true
-      }
+      createChatMsg('welcome', 'ayush', `Hey ${gfName}! ❤️ Type anything to me—ask me what I'm doing, tease me, or send me some love!`, true)
     ];
   });
 
@@ -41,10 +49,71 @@ export default function ChatPanel({
   const [activeProvider, setActiveProvider] = useState('');
   const [lastFailedMessage, setLastFailedMessage] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [speakReplies, setSpeakReplies] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const isSubmittingRef = useRef(false);
+  const abortControllerRef = useRef(null);
+  const dictationRef = useRef(null);
+
+  const SUGGESTED_PROMPTS = [
+    "Tell me a sweet joke! 😂",
+    "What are you doing right now? 👀",
+    "Give me a cute compliment 💕",
+    "Why are you so annoying? 😜"
+  ];
+
+  const handleToggleDictation = () => {
+    soundManager.playPop();
+    const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    if (!SpeechRec) {
+      alert('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    if (isDictating) {
+      if (dictationRef.current) {
+        try { dictationRef.current.stop(); } catch {}
+      }
+      setIsDictating(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRec();
+      recognition.lang = 'en-IN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => setIsDictating(true);
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map((r) => r[0].transcript)
+          .join('');
+        setInputText(transcript);
+      };
+      recognition.onerror = () => setIsDictating(false);
+      recognition.onend = () => setIsDictating(false);
+
+      dictationRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('Dictation start failed:', err);
+      setIsDictating(false);
+    }
+  };
+
+  const handleStopGeneration = () => {
+    soundManager.playPop();
+    if (abortControllerRef.current) {
+      try { abortControllerRef.current.abort(); } catch {}
+      abortControllerRef.current = null;
+    }
+    setIsTyping(false);
+    isSubmittingRef.current = false;
+  };
 
   // Auto-scroll to bottom of message list on new messages or typing state change
   const scrollToBottom = () => {
@@ -103,13 +172,7 @@ export default function ChatPanel({
     if (window.confirm(`Clear your chat history with ${ayushName}?`)) {
       clearChatHistory();
       const freshWelcome = [
-        {
-          id: 'welcome-reset',
-          sender: 'ayush',
-          text: `All fresh! What's on your mind today, ${gfName}? 🥰`,
-          timestamp: Date.now(),
-          isOfflineFallback: true
-        }
+        createChatMsg('welcome-reset', 'ayush', `All fresh! What's on your mind today, ${gfName}? 🥰`, true)
       ];
       setMessages(freshWelcome);
       setErrorMessage('');
@@ -126,13 +189,7 @@ export default function ChatPanel({
     setErrorMessage('');
     setLastFailedMessage(null);
 
-    const userMsgId = 'msg-' + Date.now();
-    const newUserMsg = {
-      id: userMsgId,
-      sender: 'user',
-      text,
-      timestamp: Date.now()
-    };
+    const newUserMsg = createChatMsg('msg', 'user', text);
 
     // Build bounded conversation history from the PREVIOUS messages (before the new user msg),
     // so the current user turn is not duplicated in both history[] and the message field.
@@ -146,6 +203,10 @@ export default function ChatPanel({
     setInputText('');
     setIsTyping(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 13000);
+
     try {
       // Call server-side endpoint (/api/chat)
       const res = await fetch('/api/chat', {
@@ -157,7 +218,7 @@ export default function ChatPanel({
           gfName,
           ayushName
         }),
-        signal: AbortSignal.timeout(13000)
+        signal: controller.signal
       });
 
       const data = await res.json().catch(() => null);
@@ -171,31 +232,21 @@ export default function ChatPanel({
         const replyText = data.reply;
         const reaction = data.reaction || detectCharacterReaction(replyText);
 
-        const aiMsg = {
-          id: 'reply-' + Date.now(),
-          sender: 'ayush',
-          text: replyText,
-          timestamp: Date.now(),
-          isOfflineFallback: isOffline,
-          provider: data.provider || (isOffline ? 'offline' : 'ai')
-        };
+        const aiMsg = createChatMsg('reply', 'ayush', replyText, isOffline, data.provider || (isOffline ? 'offline' : 'ai'));
 
         setMessages((prev) => [...prev, aiMsg]);
         soundManager.playChime();
         onAyushReply(replyText, reaction);
+
+        if (speakReplies) {
+          clonedVoiceEngine.speakPhraseWithMode(replyText, 'device').catch(() => {});
+        }
       } else if (data && data.configured === false) {
         // AI API key not configured on server: Seamless Smart Offline Fallback
         setApiStatus('offline');
         setActiveProvider('offline');
         const fallback = generateOfflineFallback(text, gfName, ayushName);
-
-        const fallbackMsg = {
-          id: 'reply-' + Date.now(),
-          sender: 'ayush',
-          text: fallback.reply,
-          timestamp: Date.now(),
-          isOfflineFallback: true
-        };
+        const fallbackMsg = createChatMsg('reply', 'ayush', fallback.reply, true);
 
         setMessages((prev) => [...prev, fallbackMsg]);
         soundManager.playChime();
@@ -203,13 +254,7 @@ export default function ChatPanel({
       } else {
         // Fallback gracefully without leaving user in error
         const fallback = generateOfflineFallback(text, gfName, ayushName);
-        const fallbackMsg = {
-          id: 'reply-' + Date.now(),
-          sender: 'ayush',
-          text: fallback.reply,
-          timestamp: Date.now(),
-          isOfflineFallback: true
-        };
+        const fallbackMsg = createChatMsg('reply', 'ayush', fallback.reply, true);
         setMessages((prev) => [...prev, fallbackMsg]);
         setApiStatus('offline');
         setActiveProvider('offline');
@@ -224,6 +269,8 @@ export default function ChatPanel({
       );
       soundManager.playBoing();
     } finally {
+      clearTimeout(timeoutId);
+      abortControllerRef.current = null;
       setIsTyping(false);
       isSubmittingRef.current = false;
     }
@@ -232,13 +279,7 @@ export default function ChatPanel({
   const handleUseOfflineFallback = () => {
     if (!lastFailedMessage) return;
     const fallback = generateOfflineFallback(lastFailedMessage, gfName, ayushName);
-    const fallbackMsg = {
-      id: 'reply-' + Date.now(),
-      sender: 'ayush',
-      text: fallback.reply,
-      timestamp: Date.now(),
-      isOfflineFallback: true
-    };
+    const fallbackMsg = createChatMsg('reply', 'ayush', fallback.reply, true);
     setMessages((prev) => [...prev, fallbackMsg]);
     setLastFailedMessage(null);
     setErrorMessage('');
@@ -279,7 +320,7 @@ export default function ChatPanel({
           const reaction = data.reaction || detectCharacterReaction(replyText);
           setMessages((prev) => [
             ...prev,
-            { id: 'reply-' + Date.now(), sender: 'ayush', text: replyText, timestamp: Date.now(), isOfflineFallback: isOffline, provider: data.provider || (isOffline ? 'offline' : 'ai') }
+            createChatMsg('reply', 'ayush', replyText, isOffline, data.provider || (isOffline ? 'offline' : 'ai'))
           ]);
           soundManager.playChime();
           onAyushReply(replyText, reaction);
@@ -287,7 +328,7 @@ export default function ChatPanel({
           const fallback = generateOfflineFallback(text, gfName, ayushName);
           setMessages((prev) => [
             ...prev,
-            { id: 'reply-' + Date.now(), sender: 'ayush', text: fallback.reply, timestamp: Date.now(), isOfflineFallback: true }
+            createChatMsg('reply', 'ayush', fallback.reply, true)
           ]);
           setApiStatus('offline');
           setActiveProvider('offline');
@@ -350,6 +391,19 @@ export default function ChatPanel({
         </div>
 
         <div className="chat-header-actions">
+          <button
+            type="button"
+            className={`chat-icon-btn ${speakReplies ? 'active-speaker' : ''}`}
+            onClick={() => {
+              soundManager.playPop();
+              setSpeakReplies(!speakReplies);
+            }}
+            title={speakReplies ? "Spoken replies: ON" : "Spoken replies: OFF"}
+            aria-label="Toggle spoken replies"
+          >
+            {speakReplies ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+
           <button
             type="button"
             className="chat-icon-btn"
@@ -448,6 +502,21 @@ export default function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Suggested Prompt Chips */}
+      <div className="chat-suggested-chips">
+        {SUGGESTED_PROMPTS.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            className="suggested-chip"
+            onClick={() => handleSend(prompt)}
+            disabled={isTyping}
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+
       {/* Quick Emoji Bar */}
       <div className="chat-quick-emojis">
         {quickEmojis.map((emoji) => (
@@ -471,23 +540,47 @@ export default function ChatPanel({
           className="chat-text-input"
           value={inputText}
           maxLength={300}
-          placeholder={`Message ${ayushName}...`}
+          placeholder={isDictating ? "Listening..." : `Message ${ayushName}...`}
           onChange={(e) => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isTyping}
           aria-label="Type a message"
         />
 
+        {/* Dictation Mic Button */}
         <button
           type="button"
-          className="chat-send-btn"
-          onClick={() => handleSend()}
-          disabled={!inputText.trim() || isTyping}
-          title="Send message (Enter)"
-          aria-label="Send message"
+          className={`chat-mic-btn ${isDictating ? 'dictating' : ''}`}
+          onClick={handleToggleDictation}
+          disabled={isTyping}
+          title={isDictating ? "Stop voice dictation" : "Dictate with voice"}
+          aria-label="Voice input"
         >
-          <Send size={16} />
+          <Mic size={16} className={isDictating ? 'mic-pulse' : ''} />
         </button>
+
+        {isTyping ? (
+          <button
+            type="button"
+            className="chat-stop-btn"
+            onClick={handleStopGeneration}
+            title="Stop generating"
+            aria-label="Stop generating"
+          >
+            <Square size={14} fill="currentColor" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="chat-send-btn"
+            onClick={() => handleSend()}
+            disabled={!inputText.trim()}
+            title="Send message (Enter)"
+            aria-label="Send message"
+          >
+            <Send size={16} />
+          </button>
+        )}
       </div>
     </div>
   );

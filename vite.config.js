@@ -55,6 +55,20 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), apiDevServerPlugin()],
     resolve: {
       dedupe: ['three']
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/three') || id.includes('@react-three')) {
+              return 'three-vendor';
+            }
+            if (id.includes('node_modules/lucide-react') || id.includes('node_modules/canvas-confetti')) {
+              return 'ui-vendor';
+            }
+          }
+        }
+      }
     }
   };
 });

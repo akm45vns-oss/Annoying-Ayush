@@ -16,6 +16,14 @@ export const DEFAULT_SETTINGS = {
   customModelUrl: '',
   voiceMode: 'device',
   recognitionLanguage: 'auto',
+  masterVolume: 1.0,
+  voiceVolume: 1.0,
+  sfxVolume: 1.0,
+  graphicsQuality: 'high',
+  reducedMotion: false,
+  hapticsEnabled: true,
+  captionsEnabled: false,
+  tutorialCompleted: false
 };
 
 export const DEFAULT_UNLOCKS = {

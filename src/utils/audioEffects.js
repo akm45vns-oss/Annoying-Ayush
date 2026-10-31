@@ -3,6 +3,8 @@ class SoundController {
   constructor() {
     this.ctx = null;
     this.isMuted = false;
+    this.masterVolume = 1.0;
+    this.sfxVolume = 1.0;
   }
 
   init() {
@@ -15,6 +17,19 @@ class SoundController {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
+  }
+
+  setMasterVolume(vol) {
+    this.masterVolume = Math.max(0, Math.min(1, Number(vol) || 0));
+  }
+
+  setSfxVolume(vol) {
+    this.sfxVolume = Math.max(0, Math.min(1, Number(vol) || 0));
+  }
+
+  getEffectiveGain(base = 0.3) {
+    if (this.isMuted) return 0;
+    return base * this.masterVolume * this.sfxVolume;
   }
 
   toggleMute() {

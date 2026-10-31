@@ -6,6 +6,13 @@ import SpeechBubble from './components/SpeechBubble';
 import InteractionMenu from './components/InteractionMenu';
 import RomanticSettingsModal from './components/RomanticSettingsModal';
 import SecretLetterModal from './components/SecretLetterModal';
+import BottomNavigation from './components/BottomNavigation';
+import WardrobePanel from './components/WardrobePanel';
+import ActivityHub from './components/ActivityHub';
+import RoomPanel from './components/RoomPanel';
+import ProfilePanel from './components/ProfilePanel';
+import DailyRewardModal from './components/DailyRewardModal';
+import OnboardingModal from './components/OnboardingModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
 import { clonedVoiceEngine } from './utils/clonedVoiceEngine';
@@ -29,11 +36,21 @@ import {
   calculateDaysTogether,
   DEFAULT_SETTINGS
 } from './utils/romanticSettings';
+import {
+  loadProgression,
+  canClaimDailyReward,
+  recordInteraction
+} from './utils/progressionStorage';
+import { clearChatHistory } from './utils/chatStorage';
 
 export default function App() {
   // Settings & Unlocks (100% local persistence)
   const [settings, setSettings] = useState(() => loadRomanticSettings());
   const [unlocks, setUnlocks] = useState(() => loadUnlocks());
+  const [progression, setProgression] = useState(() => loadProgression());
+  const [activeNav, setActiveNav] = useState('home'); // 'home' | 'wardrobe' | 'activities' | 'room' | 'profile'
+  const [isDailyRewardOpen, setIsDailyRewardOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => !settings.tutorialCompleted);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSecretLetterOpen, setIsSecretLetterOpen] = useState(false);
   const [unlockReason, setUnlockReason] = useState('secretHeart');
@@ -56,6 +73,7 @@ export default function App() {
   const [talkingVolume, setTalkingVolume] = useState(0);
   const [listeningState, setListeningState] = useState(() => talkingTomController.state);
   const [micErrorMessage, setMicErrorMessage] = useState('');
+  const [captionText, setCaptionText] = useState('');
 
   // Authoritative active status: True whenever continuous voice engine is running
   const isListening = listeningState === LISTENING_STATES.LISTENING ||
@@ -109,10 +127,12 @@ export default function App() {
   const tapResetTimerRef = useRef(null);
   const lastQuoteRef = useRef('');
 
-  // Keep soundManager mute state synced with settings
+  // Keep soundManager mute and volume state synced with settings
   useEffect(() => {
     soundManager.setMuted(!settings.soundEnabled);
-  }, [settings.soundEnabled]);
+    soundManager.setMasterVolume(settings.masterVolume ?? 1.0);
+    soundManager.setSfxVolume(settings.sfxVolume ?? 1.0);
+  }, [settings.soundEnabled, settings.masterVolume, settings.sfxVolume]);
 
   // Auto-dismiss initial greeting after 4.2 seconds
   useEffect(() => {
@@ -185,6 +205,7 @@ export default function App() {
   const handlePlaybackEnd = useCallback(() => {
     setCurrentAction('idle');
     setTalkingVolume(0);
+    setCaptionText('');
   }, []);
 
   const handleAmplitude = useCallback((vol) => {
@@ -222,6 +243,11 @@ export default function App() {
     talkingTomController.onPhraseFinalized = (phrase) => {
       talkingTomController.setSpeaking(true);
 
+      // Optional captions toast when explicitly enabled by player in settings
+      if (settings.captionsEnabled) {
+        setCaptionText(`"${phrase}"`);
+      }
+
       // Permanently use Free Indian Male Voice Engine ('device' mode) for speech repetition
       clonedVoiceEngine.speakPhraseWithMode(phrase, 'device', {
         onStart: () => {
@@ -247,7 +273,7 @@ export default function App() {
     return () => {
       talkingTomController.onPhraseFinalized = null;
     };
-  }, [handlePlaybackStart, handleAmplitude, handlePlaybackEnd]);
+  }, [handlePlaybackStart, handleAmplitude, handlePlaybackEnd, settings.captionsEnabled]);
 
   // Pause continuous repeat during AI Chat to prevent audio competition (strictly on tab transition)
   useEffect(() => {
@@ -497,6 +523,24 @@ export default function App() {
       const quote = formatDialogue("BOOP! Only {gfName} is authorized to do that! 👃✨", settings.gfName, settings.ayushName);
       showSpeech(quote, 2500);
       scheduleReturnToIdle(2500);
+    } else if (part === 'belly') {
+      soundManager.playLaugh();
+      setCurrentAction('laugh');
+      const quote = formatDialogue("Hehehe that tickles so much, {gfName}! Stop it! 🤣💕", settings.gfName, settings.ayushName);
+      showSpeech(quote, 2800);
+      scheduleReturnToIdle(2800);
+    } else if (part === 'hand') {
+      soundManager.playChime();
+      setCurrentAction('wave');
+      const quote = formatDialogue("High five, {gfName}! ✋💖 You're my favorite person!", settings.gfName, settings.ayushName);
+      showSpeech(quote, 2800);
+      scheduleReturnToIdle(2800);
+    } else if (part === 'feet') {
+      soundManager.playBoing();
+      setCurrentAction('surprised');
+      const quote = formatDialogue("Hey! Watch my sneakers, {gfName}! 👟😜", settings.gfName, settings.ayushName);
+      showSpeech(quote, 2600);
+      scheduleReturnToIdle(2600);
     } else {
       // Body / Torso
       soundManager.playPop();
@@ -505,6 +549,9 @@ export default function App() {
       showSpeech(quote, 2600);
       scheduleReturnToIdle(2500);
     }
+
+    // Award interaction progression
+    setProgression((p) => recordInteraction(p));
   }, [
     getNextDialogue,
     handleAnnoyanceTap,
@@ -516,6 +563,44 @@ export default function App() {
     settings.ayushName,
     showSpeech
   ]);
+
+  // Handle Horizontal Swipes on 3D stage
+  const handleSwipe = useCallback((direction) => {
+    interruptVoiceIfPlaying();
+    soundManager.playPop();
+    setProgression((p) => recordInteraction(p));
+    if (direction === 'left') {
+      setCurrentAction('surprised');
+      showSpeech(formatDialogue("Whoa! Dodged left like a ninja! 💨✨", settings.gfName, settings.ayushName), 2600);
+      scheduleReturnToIdle(2600);
+    } else {
+      setCurrentAction('dance');
+      showSpeech(formatDialogue("Spin moves strictly for {gfName}! 🕺💖", settings.gfName, settings.ayushName), 3000);
+      scheduleReturnToIdle(3000);
+    }
+  }, [interruptVoiceIfPlaying, scheduleReturnToIdle, settings.gfName, settings.ayushName, showSpeech]);
+
+  // Handle Double-Tap on 3D stage
+  const handleDoubleTap = useCallback(() => {
+    interruptVoiceIfPlaying();
+    soundManager.playKiss();
+    setProgression((p) => recordInteraction(p));
+    if (settings.floatingEffectsEnabled) {
+      setHeartBurst((b) => b + 2);
+    }
+    setCurrentAction('kiss');
+    showSpeech(formatDialogue("Double tap = double love for you, {gfName}! 💋💖", settings.gfName, settings.ayushName), 3000);
+    scheduleReturnToIdle(3000);
+  }, [interruptVoiceIfPlaying, scheduleReturnToIdle, settings.floatingEffectsEnabled, settings.gfName, settings.ayushName, showSpeech]);
+
+  // Trigger emote directly from profile panel
+  const handleTriggerEmote = useCallback((emoteId) => {
+    interruptVoiceIfPlaying();
+    soundManager.playPop();
+    setProgression((p) => recordInteraction(p));
+    setCurrentAction(emoteId);
+    scheduleReturnToIdle(3200);
+  }, [interruptVoiceIfPlaying, scheduleReturnToIdle]);
 
   // Bubble click cycles to next line without spamming
   const handleBubbleClick = useCallback(() => {
@@ -601,6 +686,15 @@ export default function App() {
 
   const daysTogether = calculateDaysTogether(settings.anniversaryDate);
 
+  const handleSelectNav = useCallback((navId) => {
+    setActiveNav(navId);
+  }, []);
+
+  const handleClearChatHistory = useCallback(() => {
+    clearChatHistory();
+    showSpeech(formatDialogue("Chat history cleared! ✨", settings.gfName, settings.ayushName), 2200);
+  }, [settings.gfName, settings.ayushName, showSpeech]);
+
   return (
     <div className="game-app-wrapper">
       <main className="game-container">
@@ -613,6 +707,11 @@ export default function App() {
           ayushName={settings.ayushName}
           isListening={isListening}
           onToggleListening={handleToggleListening}
+          level={progression.level}
+          coins={progression.coins}
+          isDailyClaimable={canClaimDailyReward(progression.lastDailyClaim)}
+          onOpenDailyReward={() => setIsDailyRewardOpen(true)}
+          onOpenProfile={() => setActiveNav('profile')}
         />
 
         <div className="game-play-area">
@@ -622,6 +721,13 @@ export default function App() {
             onDismiss={dismissSpeech}
             onClickBubble={handleBubbleClick} 
           />
+
+          {/* Subtitle / Caption bar during voice repeat when enabled in settings */}
+          {captionText && (
+            <div className="voice-caption-toast" role="status" aria-live="polite">
+              <span>{captionText}</span>
+            </div>
+          )}
 
           {/* 3D Scene prominently focused on Ayush (65-75% viewport) */}
           <AyushScene
@@ -633,6 +739,11 @@ export default function App() {
             heartBurst={heartBurst}
             talkingVolume={talkingVolume}
             floatingEffectsEnabled={settings.floatingEffectsEnabled}
+            roomTheme={progression.room?.currentTheme || 'studio'}
+            lightingMode={progression.room?.currentLighting || 'day'}
+            equippedWardrobe={progression.wardrobe?.equipped || {}}
+            onSwipe={handleSwipe}
+            onDoubleTap={handleDoubleTap}
           />
 
           {/* Single clear start/permission prompt when hands-free listening is not active */}
@@ -654,6 +765,7 @@ export default function App() {
           )}
         </div>
 
+        {/* Primary Action Area: Play & Romance + AI Chat */}
         <InteractionMenu
           onTriggerAction={triggerAction}
           onReset={resetToIdle}
@@ -667,7 +779,71 @@ export default function App() {
           ayushName={settings.ayushName}
           onAyushReply={handleAyushChatReply}
         />
+
+        {/* Persistent Bottom Navigation Bar */}
+        <BottomNavigation
+          activeNav={activeNav}
+          onSelectNav={handleSelectNav}
+        />
       </main>
+
+      {/* Wardrobe Bottom Sheet */}
+      <WardrobePanel
+        isOpen={activeNav === 'wardrobe'}
+        onClose={() => setActiveNav('home')}
+        progression={progression}
+        onUpdateProgression={setProgression}
+      />
+
+      {/* Activities / Mini-Games Hub Sheet */}
+      <ActivityHub
+        isOpen={activeNav === 'activities'}
+        onClose={() => setActiveNav('home')}
+        progression={progression}
+        onUpdateProgression={setProgression}
+        gfName={settings.gfName}
+        ayushName={settings.ayushName}
+      />
+
+      {/* Room Themes & Atmosphere Sheet */}
+      <RoomPanel
+        isOpen={activeNav === 'room'}
+        onClose={() => setActiveNav('home')}
+        progression={progression}
+        onUpdateProgression={setProgression}
+      />
+
+      {/* Profile & Achievements Sheet */}
+      <ProfilePanel
+        isOpen={activeNav === 'profile'}
+        onClose={() => setActiveNav('home')}
+        progression={progression}
+        onTriggerEmote={handleTriggerEmote}
+        gfName={settings.gfName}
+        ayushName={settings.ayushName}
+      />
+
+      {/* Daily Love Gift Modal */}
+      <DailyRewardModal
+        isOpen={isDailyRewardOpen}
+        onClose={() => setIsDailyRewardOpen(false)}
+        progression={progression}
+        onUpdateProgression={setProgression}
+        gfName={settings.gfName}
+      />
+
+      {/* Onboarding Welcome Tutorial */}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          const updated = { ...settings, tutorialCompleted: true };
+          setSettings(updated);
+          saveRomanticSettings(updated);
+        }}
+        gfName={settings.gfName}
+        ayushName={settings.ayushName}
+      />
 
       {/* Romantic Settings Modal */}
       <RomanticSettingsModal
@@ -676,6 +852,8 @@ export default function App() {
         settings={settings}
         onSaveSettings={handleSaveSettings}
         onResetSettings={handleResetSettings}
+        onReplayTutorial={() => setIsOnboardingOpen(true)}
+        onClearChat={handleClearChatHistory}
       />
 
       {/* Secret Romantic Letter Modal */}

@@ -11,7 +11,11 @@ import {
   RotateCcw,
   Check,
   Mic,
-  Globe
+  Globe,
+  Sliders,
+  Shield,
+  HelpCircle,
+  Trash2
 } from 'lucide-react';
 import { DEFAULT_SETTINGS, calculateDaysTogether } from '../utils/romanticSettings';
 import { soundManager } from '../utils/audioEffects';
@@ -22,7 +26,9 @@ export default function RomanticSettingsModal({
   onClose,
   settings,
   onSaveSettings,
-  onResetSettings
+  onResetSettings,
+  onReplayTutorial = () => {},
+  onClearChat = () => {}
 }) {
   const [formData, setFormData] = useState(settings);
   const [prevSettings, setPrevSettings] = useState(settings);
@@ -295,6 +301,112 @@ export default function RomanticSettingsModal({
                 onChange={(e) => handleChange('floatingEffectsEnabled', e.target.checked)}
               />
             </label>
+
+            {/* Audio Volume Controls */}
+            <div className="settings-subsection">
+              <span className="subsection-title">
+                <Sliders size={14} className="label-icon text-green" />
+                <span>Audio Levels</span>
+              </span>
+
+              <div className="slider-row">
+                <div className="slider-label-group">
+                  <span>Master Volume</span>
+                  <span className="slider-val">{Math.round((formData.masterVolume ?? 1.0) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  className="volume-slider"
+                  value={formData.masterVolume ?? 1.0}
+                  onChange={(e) => handleChange('masterVolume', parseFloat(e.target.value))}
+                />
+              </div>
+
+              <div className="slider-row">
+                <div className="slider-label-group">
+                  <span>Character Voice</span>
+                  <span className="slider-val">{Math.round((formData.voiceVolume ?? 1.0) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  className="volume-slider"
+                  value={formData.voiceVolume ?? 1.0}
+                  onChange={(e) => handleChange('voiceVolume', parseFloat(e.target.value))}
+                />
+              </div>
+
+              <div className="slider-row">
+                <div className="slider-label-group">
+                  <span>Sound Effects</span>
+                  <span className="slider-val">{Math.round((formData.sfxVolume ?? 1.0) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  className="volume-slider"
+                  value={formData.sfxVolume ?? 1.0}
+                  onChange={(e) => handleChange('sfxVolume', parseFloat(e.target.value))}
+                />
+              </div>
+            </div>
+
+            {/* Graphics Quality */}
+            <div className="settings-subsection">
+              <span className="subsection-title">Graphics & Performance</span>
+              <div className="graphics-presets-row">
+                {['low', 'balanced', 'high'].map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    className={`quality-btn ${(formData.graphicsQuality || 'high') === q ? 'active' : ''}`}
+                    onClick={() => {
+                      soundManager.playPop();
+                      handleChange('graphicsQuality', q);
+                    }}
+                  >
+                    {q.charAt(0).toUpperCase() + q.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="toggle-row">
+              <div className="toggle-info">
+                <div>
+                  <span className="toggle-title">Reduced Motion</span>
+                  <span className="toggle-desc">Minimizes spring bouncing & camera motion</span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                className="romantic-checkbox"
+                checked={!!formData.reducedMotion}
+                onChange={(e) => handleChange('reducedMotion', e.target.checked)}
+              />
+            </label>
+
+            <label className="toggle-row">
+              <div className="toggle-info">
+                <div>
+                  <span className="toggle-title">Captions</span>
+                  <span className="toggle-desc">Show speech subtitles during voice repeat</span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                className="romantic-checkbox"
+                checked={!!formData.captionsEnabled}
+                onChange={(e) => handleChange('captionsEnabled', e.target.checked)}
+              />
+            </label>
           </section>
 
           {/* 3. Speech & Language Recognition */}
@@ -553,6 +665,47 @@ export default function RomanticSettingsModal({
               <p className="model-path-note">
                 To set your permanent avatar: place your rigged model in <code>public/models/ayush.glb</code>.
               </p>
+            </div>
+          </section>
+
+          {/* 5. Privacy, Tutorial & Data Management */}
+          <section className="settings-section">
+            <h3 className="section-title">
+              <Shield size={15} className="title-icon text-green" />
+              <span>Privacy & Game Data</span>
+            </h3>
+
+            <div className="privacy-info-card">
+              <p className="privacy-text">
+                🔒 <strong>100% Client-Side Privacy:</strong> Microphone speech recognition is processed locally in real-time. No microphone recordings are ever stored or transmitted to external servers.
+              </p>
+            </div>
+
+            <div className="data-actions-row">
+              <button
+                type="button"
+                className="action-pill-btn tutorial-btn"
+                onClick={() => {
+                  soundManager.playPop();
+                  onReplayTutorial();
+                  onClose();
+                }}
+              >
+                <HelpCircle size={14} />
+                <span>Replay Tutorial</span>
+              </button>
+
+              <button
+                type="button"
+                className="action-pill-btn clear-chat-btn"
+                onClick={() => {
+                  soundManager.playPop();
+                  onClearChat();
+                }}
+              >
+                <Trash2 size={14} />
+                <span>Clear Chat History</span>
+              </button>
             </div>
           </section>
         </div>

@@ -4,6 +4,9 @@ import { OrbitControls, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import AyushModelManager from './AyushModelManager';
 import FloatingHearts from './FloatingHearts';
+import RoomEnvironment from './RoomEnvironment';
+import WardrobeAccessories3D from './WardrobeAccessories3D';
+import { LIGHTING_PRESETS } from '../utils/roomSettings';
 
 // Deterministic particle positions generated once
 const PARTICLE_COUNT = 20;
@@ -119,12 +122,53 @@ export default function AyushScene({
   setIsHovered,
   heartBurst = 0,
   talkingVolume = 0,
-  floatingEffectsEnabled = true
+  floatingEffectsEnabled = true,
+  roomTheme = 'studio',
+  lightingMode = 'day',
+  equippedWardrobe = {},
+  onSwipe = () => {},
+  onDoubleTap = () => {}
 }) {
   const controlsRef = useRef();
+  const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
+  const lastTapTimeRef = useRef(0);
+
+  const handlePointerDown = (e) => {
+    touchStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+
+    // Check for double tap
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 320) {
+      onDoubleTap();
+      lastTapTimeRef.current = 0;
+    } else {
+      lastTapTimeRef.current = now;
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    const deltaX = e.clientX - touchStartRef.current.x;
+    const deltaY = e.clientY - touchStartRef.current.y;
+    const duration = Date.now() - touchStartRef.current.time;
+
+    // Detect horizontal swipe (at least 60px distance within 450ms)
+    if (Math.abs(deltaX) > 60 && Math.abs(deltaY) < 50 && duration < 450) {
+      if (deltaX > 0) {
+        onSwipe('right');
+      } else {
+        onSwipe('left');
+      }
+    }
+  };
+
+  const preset = LIGHTING_PRESETS[lightingMode] || LIGHTING_PRESETS.day;
 
   return (
-    <div className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}>
+    <div 
+      className={`scene-container ${isHovered ? 'cursor-grab' : ''}`}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+    >
       <Canvas
         shadows
         // Camera positioned for prominent full-body framing (83% viewport height) with headroom above hair
@@ -133,29 +177,35 @@ export default function AyushScene({
       >
         <FaceFocusedCameraController controlsRef={controlsRef} />
 
-        {/* Ambient & Key Lighting */}
-        <ambientLight intensity={0.9} color="#fff8f0" />
+        {/* Dynamic Atmosphere & Lighting Preset */}
+        <ambientLight intensity={preset.ambientIntensity} color={preset.ambientColor} />
         
         <directionalLight
-          position={[2.5, 4.5, 3.5]}
-          intensity={1.2}
+          position={preset.sunPosition}
+          intensity={preset.sunIntensity}
           castShadow
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
           shadow-bias={-0.0001}
-          color="#fff5eb"
+          color={preset.sunColor}
         />
 
-        {/* Soft Pink Rim / Fill Light */}
-        <pointLight position={[-2.5, 2, -1.8]} intensity={0.65} color="#ffb3c6" />
+        {/* Soft Rim / Fill Light */}
+        <pointLight position={[-2.5, 2, -1.8]} intensity={preset.rimIntensity} color={preset.rimColor} />
 
         {/* Warm Bottom Bounce Light */}
-        <pointLight position={[0, -0.8, 1.8]} intensity={0.35} color="#ffd1dc" />
+        <pointLight position={[0, -0.8, 1.8]} intensity={0.35} color={preset.bounceColor} />
+
+        {/* Room Environment & Background */}
+        <RoomEnvironment themeId={roomTheme} lightingMode={lightingMode} />
 
         {/* 3D Studio Stage & Atmosphere */}
         <StudioStage />
         {floatingEffectsEnabled && <FloatingParticles />}
         {floatingEffectsEnabled && <FloatingHearts burstTrigger={heartBurst} />}
+
+        {/* 3D Wardrobe Accessories (Hats, Glasses, Bowties, Wings) */}
+        <WardrobeAccessories3D equipped={equippedWardrobe} />
 
         {/* Central Character (Custom Rigged GLB or Fallback Procedural Chibi) */}
         <AyushModelManager

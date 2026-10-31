@@ -151,13 +151,15 @@ export default function AyushCharacter({
 
     // Eyelid targets based on action
     let targetEyelid = isBlinkingRef.current ? 1.0 : 0.05;
-    if (currentAction === 'kiss' || currentAction === 'hug' || currentAction === 'cuddle') {
+    if (currentAction === 'kiss' || currentAction === 'hug' || currentAction === 'cuddle' || currentAction === 'romantic') {
       targetEyelid = 0.85; // gently closed / dreamy eyes
+    } else if (currentAction === 'sleeping') {
+      targetEyelid = 1.0; // eyes completely closed
     } else if (currentAction === 'blush') {
       targetEyelid = 0.65; // shy bashful eyes
-    } else if (currentAction === 'surprised') {
+    } else if (currentAction === 'surprised' || currentAction === 'hurt_comical') {
       targetEyelid = 0.0; // wide open
-    } else if (currentAction === 'laugh') {
+    } else if (currentAction === 'laugh' || currentAction === 'celebrating' || currentAction === 'happy') {
       targetEyelid = 0.55; // happy anime smiling crescents
     }
 
@@ -230,6 +232,36 @@ export default function AyushCharacter({
     } else if (currentAction === 'boop') {
       targetBlushOpacity = 0.9;
       targetEyebrowY = 0.22;
+    } else if (currentAction === 'sleeping') {
+      targetEyebrowY = 0.18;
+      targetEyebrowRot = 0.02;
+      targetMouthScaleX = 0.9;
+      targetMouthScaleY = 0.4;
+    } else if (currentAction === 'celebrating') {
+      targetEyebrowY = 0.25;
+      targetEyebrowRot = 0.18;
+      targetMouthScaleX = 1.3;
+      targetMouthScaleY = 1.4;
+      targetBlushOpacity = 0.85;
+    } else if (currentAction === 'thinking') {
+      targetEyebrowY = 0.23;
+      targetEyebrowRot = -0.08;
+      targetMouthScaleX = 0.85;
+      targetMouthScaleY = 0.6;
+    } else if (currentAction === 'sad') {
+      targetEyebrowY = 0.16;
+      targetEyebrowRot = -0.18;
+      targetMouthScaleX = 0.9;
+      targetMouthScaleY = 0.4;
+    } else if (currentAction === 'eating') {
+      const chew = Math.abs(Math.sin(t * 12));
+      targetMouthScaleY = 0.6 + chew * 0.9;
+      targetMouthScaleX = 1.1;
+    } else if (currentAction === 'hurt_comical') {
+      targetEyebrowY = 0.24;
+      targetEyebrowRot = 0.25;
+      targetMouthScaleX = 1.2;
+      targetMouthScaleY = 1.3;
     }
 
     if (leftEyebrowRef.current && rightEyebrowRef.current) {
@@ -372,6 +404,45 @@ export default function AyushCharacter({
       }
     } else if (noseRef.current) {
       noseRef.current.scale.set(1, 1, 1);
+    } else if (currentAction === 'sleeping') {
+      targetHeadRotX = 0.18;
+      targetHeadRotZ = 0.08;
+      targetBodyY = 0.93;
+      targetLeftArmRotZ = 0.15;
+      targetRightArmRotZ = -0.15;
+    } else if (currentAction === 'celebrating') {
+      targetHeadRotX = -0.16 + Math.sin(t * 10) * 0.05;
+      targetBodyY = 0.97 + Math.abs(Math.sin(t * 8)) * 0.08;
+      targetLeftArmRotZ = 2.4;
+      targetLeftArmRotX = Math.sin(t * 10) * 0.2;
+      targetRightArmRotZ = -2.4;
+      targetRightArmRotX = Math.cos(t * 10) * 0.2;
+    } else if (currentAction === 'thinking') {
+      targetHeadRotX = -0.06;
+      targetHeadRotZ = 0.10;
+      targetHeadRotY = -0.12;
+      targetRightArmRotZ = -1.6;
+      targetRightArmRotX = -0.8;
+      targetLeftArmRotZ = 0.2;
+    } else if (currentAction === 'sad') {
+      targetHeadRotX = 0.20;
+      targetBodyY = 0.91;
+      targetLeftArmRotZ = 0.1;
+      targetRightArmRotZ = -0.1;
+    } else if (currentAction === 'listening') {
+      targetHeadRotZ = 0.14;
+      targetHeadRotY = -0.10;
+      targetRightArmRotZ = -0.8;
+      targetRightArmRotX = -0.3;
+    } else if (currentAction === 'eating') {
+      targetRightArmRotZ = -1.7 + Math.sin(t * 12) * 0.15;
+      targetRightArmRotX = -0.9;
+    } else if (currentAction === 'hurt_comical') {
+      const wobble = Math.sin(t * 22) * 0.12;
+      targetHeadRotZ = wobble;
+      targetBodyRotZ = -wobble * 0.5;
+      targetLeftArmRotZ = 0.7;
+      targetRightArmRotZ = -0.7;
     }
 
     // Hover curious glance
@@ -626,8 +697,13 @@ export default function AyushCharacter({
           <meshStandardMaterial color={hoodiePocketColor} roughness={0.75} />
         </mesh>
 
-        {/* Pocket */}
-        <mesh position={[0, 0.02, 0.38]}>
+        {/* Pocket (Belly Tickle Zone) */}
+        <mesh 
+          position={[0, 0.02, 0.38]}
+          onPointerDown={(e) => handlePointerDown(e, 'belly')}
+          onPointerUp={(e) => handlePointerUp(e, 'belly')}
+          onPointerCancel={handlePointerCancel}
+        >
           <boxGeometry args={[0.38, 0.22, 0.08]} />
           <meshStandardMaterial color={hoodiePocketColor} roughness={0.75} />
         </mesh>
@@ -654,7 +730,13 @@ export default function AyushCharacter({
             <capsuleGeometry args={[0.11, 0.42, 16, 16]} />
             <meshStandardMaterial color={hoodieColor} roughness={0.7} />
           </mesh>
-          <mesh castShadow position={[-0.05, -0.56, 0.02]}>
+          <mesh 
+            castShadow 
+            position={[-0.05, -0.56, 0.02]}
+            onPointerDown={(e) => handlePointerDown(e, 'hand')}
+            onPointerUp={(e) => handlePointerUp(e, 'hand')}
+            onPointerCancel={handlePointerCancel}
+          >
             <sphereGeometry args={[0.09, 16, 16]} />
             <meshStandardMaterial color={skinColor} roughness={0.65} />
           </mesh>
@@ -666,7 +748,13 @@ export default function AyushCharacter({
             <capsuleGeometry args={[0.11, 0.42, 16, 16]} />
             <meshStandardMaterial color={hoodieColor} roughness={0.7} />
           </mesh>
-          <mesh castShadow position={[0.05, -0.56, 0.02]}>
+          <mesh 
+            castShadow 
+            position={[0.05, -0.56, 0.02]}
+            onPointerDown={(e) => handlePointerDown(e, 'hand')}
+            onPointerUp={(e) => handlePointerUp(e, 'hand')}
+            onPointerCancel={handlePointerCancel}
+          >
             <sphereGeometry args={[0.09, 16, 16]} />
             <meshStandardMaterial color={skinColor} roughness={0.65} />
           </mesh>
@@ -679,7 +767,12 @@ export default function AyushCharacter({
           <capsuleGeometry args={[0.13, 0.48, 16, 16]} />
           <meshStandardMaterial color={pantsColor} roughness={0.8} />
         </mesh>
-        <group position={[-0.2, 0.12, 0.06]}>
+        <group 
+          position={[-0.2, 0.12, 0.06]}
+          onPointerDown={(e) => handlePointerDown(e, 'feet')}
+          onPointerUp={(e) => handlePointerUp(e, 'feet')}
+          onPointerCancel={handlePointerCancel}
+        >
           <mesh castShadow>
             <boxGeometry args={[0.22, 0.16, 0.38]} />
             <meshStandardMaterial color={shoeWhite} roughness={0.4} />
@@ -698,7 +791,12 @@ export default function AyushCharacter({
           <capsuleGeometry args={[0.13, 0.48, 16, 16]} />
           <meshStandardMaterial color={pantsColor} roughness={0.8} />
         </mesh>
-        <group position={[0.2, 0.12, 0.06]}>
+        <group 
+          position={[0.2, 0.12, 0.06]}
+          onPointerDown={(e) => handlePointerDown(e, 'feet')}
+          onPointerUp={(e) => handlePointerUp(e, 'feet')}
+          onPointerCancel={handlePointerCancel}
+        >
           <mesh castShadow>
             <boxGeometry args={[0.22, 0.16, 0.38]} />
             <meshStandardMaterial color={shoeWhite} roughness={0.4} />

@@ -244,7 +244,7 @@ export default function CustomAyushModel({
     // 2. Drive Morph Targets (Blend Shapes)
     const morphMeshes = morphMeshesRef.current;
     if (morphMeshes.length > 0) {
-      const blinkInfluence = isBlinkingRef.current ? 1.0 : 0.0;
+      const blinkInfluence = (isBlinkingRef.current || currentAction === 'sleeping') ? 1.0 : 0.0;
 
       // Calculate speech mouth openness
       let speechMouthOpen = 0;
@@ -329,6 +329,30 @@ export default function CustomAyushModel({
       } else if (currentAction === 'annoyed') {
         targetHeadRotY = 0.15;
         targetHeadRotX = -0.03;
+      } else if (currentAction === 'sleeping') {
+        targetHeadRotX = 0.22;
+        targetHeadRotY = 0;
+        targetHeadRotZ = 0.04;
+      } else if (currentAction === 'celebrating') {
+        targetHeadRotX = -0.12 + Math.sin(t * 12) * 0.04;
+        targetHeadRotY = 0;
+      } else if (currentAction === 'thinking') {
+        targetHeadRotX = -0.06;
+        targetHeadRotY = -0.10;
+        targetHeadRotZ = 0.08;
+      } else if (currentAction === 'sad') {
+        targetHeadRotX = 0.18;
+        targetHeadRotY = 0;
+      } else if (currentAction === 'listening') {
+        targetHeadRotX = 0.02;
+        targetHeadRotY = -0.12;
+        targetHeadRotZ = 0.07;
+      } else if (currentAction === 'eating') {
+        targetHeadRotX = 0.06;
+        targetHeadRotY = 0;
+      } else if (currentAction === 'hurt_comical') {
+        targetHeadRotX = -0.08 + Math.sin(t * 18) * 0.06;
+        targetHeadRotY = Math.cos(t * 18) * 0.06;
       }
 
       bones.head.rotation.x = THREE.MathUtils.damp(bones.head.rotation.x, targetHeadRotX, 8, delta);
@@ -407,6 +431,52 @@ export default function CustomAyushModel({
         targetRightArmX = 1.10;
         targetLeftForeArmX = 0.50;
         targetRightForeArmX = 0.50;
+      } else if (currentAction === 'sleeping') {
+        // Relaxed resting arms beside torso
+        targetLeftArmX = 1.35;
+        targetRightArmX = 1.35;
+      } else if (currentAction === 'celebrating') {
+        // Both arms joyfully raised high
+        targetLeftArmX = 0.20;
+        targetRightArmX = 0.20;
+        targetLeftArmY = 0.40;
+        targetRightArmY = -0.40;
+        targetLeftForeArmX = 0.85;
+        targetRightForeArmX = 0.85;
+      } else if (currentAction === 'thinking') {
+        // Right hand to chin, left arm resting
+        targetRightArmX = 0.60;
+        targetRightArmY = -0.25;
+        targetRightArmZ = 0.20;
+        targetRightForeArmX = 1.25;
+      } else if (currentAction === 'sad') {
+        targetLeftArmX = 1.35;
+        targetRightArmX = 1.35;
+        targetLeftForeArmX = 0.20;
+        targetRightForeArmX = 0.20;
+      } else if (currentAction === 'listening') {
+        // Attentive lean, right hand raised slightly toward ear
+        targetRightArmX = 0.75;
+        targetRightArmY = -0.20;
+        targetRightForeArmX = 0.90;
+      } else if (currentAction === 'eating') {
+        // Right hand to mouth rhythm
+        const chew = Math.sin(t * 10) * 0.08;
+        targetRightArmX = 0.55 + chew;
+        targetRightForeArmX = 1.35;
+      } else if (currentAction === 'wave') {
+        // Wave right hand
+        const waveSway = Math.sin(t * 14) * 0.25;
+        targetRightArmX = 0.40;
+        targetRightArmY = -0.30;
+        targetRightArmZ = waveSway;
+        targetRightForeArmX = 1.10;
+      } else if (currentAction === 'hurt_comical') {
+        // Stagger back
+        targetLeftArmX = 0.80;
+        targetRightArmX = 0.80;
+        targetLeftForeArmX = 0.60;
+        targetRightForeArmX = 0.60;
       }
 
       bones.leftArm.rotation.x = THREE.MathUtils.damp(bones.leftArm.rotation.x, targetLeftArmX, 8, delta);
@@ -445,41 +515,82 @@ export default function CustomAyushModel({
       {/* The Rigged 3D Cloned Model */}
       <primitive ref={modelRef} object={clonedScene} />
 
-      {/* Invisible Interactive Hitboxes covering Head, Cheeks/Face, and Torso */}
+      {/* Invisible Interactive Hitboxes covering Head, Cheeks/Face, Torso, Belly, Hands, and Feet */}
       {/* Head hitbox */}
       <mesh
         position={[0, 1.08, 0.04]}
-        visible={false}
         onPointerDown={(e) => handlePointerDown(e, 'head')}
         onPointerUp={(e) => handlePointerUp(e, 'head')}
         onPointerCancel={handlePointerCancel}
       >
         <sphereGeometry args={[0.28, 12, 12]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
       {/* Cheeks/Nose hitbox */}
       <mesh
         position={[0, 0.98, 0.16]}
-        visible={false}
         onPointerDown={(e) => handlePointerDown(e, 'cheeks')}
         onPointerUp={(e) => handlePointerUp(e, 'cheeks')}
         onPointerCancel={handlePointerCancel}
       >
         <boxGeometry args={[0.3, 0.18, 0.18]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Torso / Body hitbox */}
+      {/* Torso / Upper Body hitbox */}
       <mesh
-        position={[0, 0.38, 0]}
-        visible={false}
+        position={[0, 0.55, 0]}
         onPointerDown={(e) => handlePointerDown(e, 'body')}
         onPointerUp={(e) => handlePointerUp(e, 'body')}
         onPointerCancel={handlePointerCancel}
       >
-        <cylinderGeometry args={[0.32, 0.35, 0.75, 12]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <cylinderGeometry args={[0.32, 0.35, 0.45, 12]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Belly Tickle hitbox */}
+      <mesh
+        position={[0, 0.25, 0.12]}
+        onPointerDown={(e) => handlePointerDown(e, 'belly')}
+        onPointerUp={(e) => handlePointerUp(e, 'belly')}
+        onPointerCancel={handlePointerCancel}
+      >
+        <sphereGeometry args={[0.18, 10, 10]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Left Hand hitbox */}
+      <mesh
+        position={[-0.32, 0.05, 0.05]}
+        onPointerDown={(e) => handlePointerDown(e, 'hand')}
+        onPointerUp={(e) => handlePointerUp(e, 'hand')}
+        onPointerCancel={handlePointerCancel}
+      >
+        <sphereGeometry args={[0.14, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Right Hand hitbox */}
+      <mesh
+        position={[0.32, 0.05, 0.05]}
+        onPointerDown={(e) => handlePointerDown(e, 'hand')}
+        onPointerUp={(e) => handlePointerUp(e, 'hand')}
+        onPointerCancel={handlePointerCancel}
+      >
+        <sphereGeometry args={[0.14, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {/* Feet hitbox */}
+      <mesh
+        position={[0, -0.78, 0.08]}
+        onPointerDown={(e) => handlePointerDown(e, 'feet')}
+        onPointerUp={(e) => handlePointerUp(e, 'feet')}
+        onPointerCancel={handlePointerCancel}
+      >
+        <boxGeometry args={[0.42, 0.18, 0.28]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
     </group>
   );
