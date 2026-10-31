@@ -1,0 +1,10 @@
+{
+  "appId": "com.ayush.annoyingayush",
+  "appName": "Annoying Ayush",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
+

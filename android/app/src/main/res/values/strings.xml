@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Annoying Ayush</string>
+    <string name="title_activity_main">Annoying Ayush</string>
+    <string name="package_name">com.ayush.annoyingayush</string>
+    <string name="custom_url_scheme">com.ayush.annoyingayush</string>
+</resources>

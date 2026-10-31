@@ -4853,6 +4853,68 @@ html, body {
   border-color: var(--color-primary);
 }
 
+.apk-direct-box {
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.apk-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #22c55e;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 6px;
+}
+
+.apk-direct-box p {
+  margin: 0 0 10px 0;
+  font-size: 0.82rem;
+  color: #166534;
+  line-height: 1.4;
+}
+
+.download-apk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: none;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.download-apk-btn:hover {
+  background: #15803d;
+  transform: translateY(-1px);
+}
+
+.copy-link-btn.apk-btn {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #16a34a;
+}
+
+.copy-link-btn.apk-btn:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
 .copy-link-btn.zip-download-btn {
   background: #fdf2f8;
   border-color: #fbcfe8;

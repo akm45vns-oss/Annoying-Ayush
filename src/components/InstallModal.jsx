@@ -53,6 +53,11 @@ export default function InstallModal({
     window.open('https://github.com/akm45vns-oss/Annoying-Ayush/archive/refs/heads/main.zip', '_blank');
   };
 
+  const handleDownloadApk = () => {
+    soundManager.playSparkle();
+    window.open('https://github.com/akm45vns-oss/Annoying-Ayush/actions', '_blank');
+  };
+
   const handleCopyLink = () => {
     soundManager.playPop();
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -171,6 +176,20 @@ export default function InstallModal({
         <div className="install-steps-container">
           {platform === 'android' && (
             <div className="install-step-list">
+              <div className="apk-direct-box">
+                <span className="apk-badge">Direct Android .APK</span>
+                <p>Install directly from your browser below, or download the precompiled <code>.apk</code> build:</p>
+                <button
+                  type="button"
+                  className="download-apk-btn"
+                  onClick={handleDownloadApk}
+                >
+                  <Download size={15} />
+                  <span>Download .APK Package</span>
+                  <ArrowUpRight size={13} />
+                </button>
+              </div>
+
               <div className="install-step-item">
                 <div className="step-number">1</div>
                 <div className="step-desc">
@@ -265,7 +284,18 @@ export default function InstallModal({
             onClick={handleCopyLink}
           >
             {copied ? <Check size={15} /> : <Share size={15} />}
-            <span>{copied ? 'Link Copied! 💖' : 'Copy Game Link for Phone'}</span>
+            <span>{copied ? 'Link Copied! 💖' : 'Copy Link for Phone'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="copy-link-btn apk-btn"
+            onClick={handleDownloadApk}
+            title="Download compiled Android .apk build"
+          >
+            <Download size={15} />
+            <span>Download .APK</span>
+            <ArrowUpRight size={13} />
           </button>
 
           <button
@@ -275,7 +305,7 @@ export default function InstallModal({
             title="Download full project ZIP archive"
           >
             <FolderArchive size={15} />
-            <span>Download Offline ZIP</span>
+            <span>Project ZIP</span>
             <ArrowUpRight size={13} />
           </button>
         </div>

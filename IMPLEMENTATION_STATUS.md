@@ -271,3 +271,7 @@
 6. **Wardrobe & Room**:
    - Open Wardrobe and equip accessories (Golden Crown, Blossom Clip, Heart Shades).
    - Open Room to change themes (Studio, Sunset, Night Sky).
+7. **Android .APK Compilation**:
+   - Native Android Studio project generated in `android/` using Capacitor.
+   - Automated GitHub Actions CI workflow in `.github/workflows/build-apk.yml` compiles `Annoying-Ayush.apk` automatically on push.
+   - APK artifact available directly under GitHub Actions tab or via in-game Install Modal.
