@@ -760,6 +760,7 @@ export default function App() {
           isDailyClaimable={canClaimDailyReward(progression.lastDailyClaim)}
           onOpenDailyReward={() => setIsDailyRewardOpen(true)}
           onOpenProfile={() => setActiveNav('profile')}
+          onOpenInstall={handleInstallApp}
         />
 
         <div className="game-play-area">

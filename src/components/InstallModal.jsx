@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Smartphone, Share, MoreVertical, PlusSquare, Laptop, Download, Check, Sparkles } from 'lucide-react';
+import { X, Smartphone, Share, MoreVertical, PlusSquare, Laptop, Download, Check, Sparkles, FolderArchive, ArrowUpRight } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
 export default function InstallModal({
@@ -19,22 +19,38 @@ export default function InstallModal({
     return 'desktop';
   });
   const [copied, setCopied] = useState(false);
+  const [showGuideNotice, setShowGuideNotice] = useState(false);
 
   if (!isOpen) return null;
 
+  const currentPrompt = deferredPrompt || (typeof window !== 'undefined' ? window.__deferredPrompt : null);
+  const isAlreadyInstalled = typeof window !== 'undefined' && (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator?.standalone === true
+  );
+
   const handleNativeInstall = async () => {
-    if (!deferredPrompt) return;
-    soundManager.playSparkle();
-    deferredPrompt.prompt();
-    try {
-      const choice = await deferredPrompt.userChoice;
-      if (choice && choice.outcome === 'accepted') {
-        if (onPromptSuccess) onPromptSuccess();
-        onClose();
+    if (currentPrompt) {
+      soundManager.playSparkle();
+      currentPrompt.prompt();
+      try {
+        const choice = await currentPrompt.userChoice;
+        if (choice && choice.outcome === 'accepted') {
+          if (onPromptSuccess) onPromptSuccess();
+          onClose();
+        }
+      } catch (err) {
+        console.warn('Install prompt error:', err);
       }
-    } catch (err) {
-      console.warn('Install prompt error:', err);
+    } else {
+      soundManager.playPop();
+      setShowGuideNotice(true);
     }
+  };
+
+  const handleDownloadZip = () => {
+    soundManager.playSparkle();
+    window.open('https://github.com/akm45vns-oss/Annoying-Ayush/archive/refs/heads/main.zip', '_blank');
   };
 
   const handleCopyLink = () => {
@@ -59,8 +75,8 @@ export default function InstallModal({
 
         <div className="sheet-header">
           <div className="sheet-title-group">
-            <h2 className="sheet-title">Install Annoying Ayush 📲</h2>
-            <p className="sheet-subtitle">Add to your home screen for full-screen mode & quick access</p>
+            <h2 className="sheet-title">Install & Download 📲</h2>
+            <p className="sheet-subtitle">Add Ayush to your home screen or download offline package</p>
           </div>
           <button 
             type="button" 
@@ -72,14 +88,28 @@ export default function InstallModal({
           </button>
         </div>
 
-        {/* If Chrome beforeinstallprompt is ready, provide direct 1-click install */}
-        {deferredPrompt && (
+        {/* Status / Install Banner */}
+        {isAlreadyInstalled ? (
+          <div className="install-instant-banner installed">
+            <div className="instant-banner-text">
+              <Sparkles size={18} className="instant-sparkle" />
+              <div>
+                <strong>App is Already Installed! 🎉</strong>
+                <p>Ayush is running in standalone full-screen mode on your device.</p>
+              </div>
+            </div>
+          </div>
+        ) : (
           <div className="install-instant-banner">
             <div className="instant-banner-text">
               <Sparkles size={18} className="instant-sparkle" />
               <div>
-                <strong>One-Click Install Ready!</strong>
-                <p>Tap below to add Ayush directly to your home screen.</p>
+                <strong>{currentPrompt ? 'One-Click Install Ready!' : 'Fast App Install'}</strong>
+                <p>
+                  {currentPrompt 
+                    ? 'Tap below to add Ayush directly to your device home screen.' 
+                    : 'Add Ayush to your home screen or install directly from browser.'}
+                </p>
               </div>
             </div>
             <button
@@ -88,8 +118,13 @@ export default function InstallModal({
               onClick={handleNativeInstall}
             >
               <Download size={16} />
-              <span>Install to Home Screen</span>
+              <span>{currentPrompt ? 'Install to Home Screen Now' : 'Tap for Install Steps'}</span>
             </button>
+            {showGuideNotice && !currentPrompt && (
+              <p className="install-guide-notice">
+                👉 Follow the quick steps below for your {platform === 'desktop' ? 'browser' : 'device'}!
+              </p>
+            )}
           </div>
         )}
 
@@ -128,7 +163,7 @@ export default function InstallModal({
             }}
           >
             <Laptop size={15} />
-            <span>PC / Mac</span>
+            <span>PC / Mac / Brave</span>
           </button>
         </div>
 
@@ -139,7 +174,7 @@ export default function InstallModal({
               <div className="install-step-item">
                 <div className="step-number">1</div>
                 <div className="step-desc">
-                  Open this page in <strong>Google Chrome</strong> or your default browser.
+                  Open this page in <strong>Google Chrome</strong> or your default mobile browser.
                 </div>
               </div>
               <div className="install-step-item">
@@ -157,7 +192,7 @@ export default function InstallModal({
               <div className="install-step-item">
                 <div className="step-number">4</div>
                 <div className="step-desc">
-                  Tap <strong>"Install"</strong> — Ayush is now on your home screen! 💕
+                  Tap <strong>"Install"</strong> — Ayush is now saved on your home screen! 💕
                 </div>
               </div>
             </div>
@@ -180,13 +215,13 @@ export default function InstallModal({
               <div className="install-step-item">
                 <div className="step-number">3</div>
                 <div className="step-desc">
-                  Scroll down the menu and tap <strong>"Add to Home Screen"</strong> (<PlusSquare size={14} className="inline-icon" />).
+                  Scroll down the share sheet and tap <strong>"Add to Home Screen"</strong> (<PlusSquare size={14} className="inline-icon" />).
                 </div>
               </div>
               <div className="install-step-item">
                 <div className="step-number">4</div>
                 <div className="step-desc">
-                  Tap <strong>"Add"</strong> in the top right — launch anytime from your home screen!
+                  Tap <strong>"Add"</strong> in top right — launch full-screen anytime from your home screen!
                 </div>
               </div>
             </div>
@@ -197,26 +232,32 @@ export default function InstallModal({
               <div className="install-step-item">
                 <div className="step-number">1</div>
                 <div className="step-desc">
-                  Open this page in <strong>Google Chrome</strong>, <strong>Edge</strong>, or <strong>Brave</strong>.
+                  In <strong>Chrome, Edge, or Brave</strong>, look at the right side of the address bar above.
                 </div>
               </div>
               <div className="install-step-item">
                 <div className="step-number">2</div>
                 <div className="step-desc">
-                  Look at the right side of your browser's address (URL) bar for the <strong>Install (<Download size={14} className="inline-icon" />)</strong> icon.
+                  Click the <strong>Install App (<Download size={14} className="inline-icon" />)</strong> icon in the address bar.
                 </div>
               </div>
               <div className="install-step-item">
                 <div className="step-number">3</div>
                 <div className="step-desc">
-                  Click <strong>Install</strong> to open Ayush in a dedicated distraction-free window!
+                  Alternatively: Click browser menu (<strong>⋮</strong> or <strong>≡</strong>) ➔ <strong>"Install Annoying Ayush..."</strong>.
+                </div>
+              </div>
+              <div className="install-step-item">
+                <div className="step-number">4</div>
+                <div className="step-desc">
+                  Click <strong>Install</strong> to launch Ayush in a dedicated standalone app window!
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Copy Shareable Link Action */}
+        {/* Footer Actions: Download Offline ZIP & Copy Link */}
         <div className="install-footer">
           <button
             type="button"
@@ -225,6 +266,17 @@ export default function InstallModal({
           >
             {copied ? <Check size={15} /> : <Share size={15} />}
             <span>{copied ? 'Link Copied! 💖' : 'Copy Game Link for Phone'}</span>
+          </button>
+
+          <button
+            type="button"
+            className="copy-link-btn zip-download-btn"
+            onClick={handleDownloadZip}
+            title="Download full project ZIP archive"
+          >
+            <FolderArchive size={15} />
+            <span>Download Offline ZIP</span>
+            <ArrowUpRight size={13} />
           </button>
         </div>
       </div>

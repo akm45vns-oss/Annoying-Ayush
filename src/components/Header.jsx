@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Settings, Mic } from 'lucide-react';
+import { X, Settings, Mic, Download } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
 export default function Header({
@@ -14,7 +14,8 @@ export default function Header({
   level = 1,
   isDailyClaimable = false,
   onOpenDailyReward = () => {},
-  onOpenProfile = () => {}
+  onOpenProfile = () => {},
+  onOpenInstall = () => {}
 }) {
   const [showInfo, setShowInfo] = useState(false);
   const heartTapsRef = useRef(0);
@@ -103,6 +104,21 @@ export default function Header({
           >
             <span className="level-num">Lv.{level}</span>
           </div>
+
+          {/* Download & Install App Button */}
+          <button
+            type="button"
+            className="header-install-pill"
+            onClick={() => {
+              soundManager.playSparkle();
+              onOpenInstall();
+            }}
+            title="Download & Install App"
+            aria-label="Download and Install App"
+          >
+            <Download size={14} className="install-pill-icon" />
+            <span className="install-pill-text">Install</span>
+          </button>
 
           {/* Settings */}
           <button

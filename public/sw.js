@@ -11,17 +11,20 @@ const STATIC_PRECACHE_URLS = [
   '/',
   '/index.html',
   '/favicon.svg',
+  '/manifest.json',
   '/manifest.webmanifest',
   '/pwa-192x192.png',
   '/pwa-512x512.png',
   '/apple-touch-icon.png'
 ];
 
-// Install: Pre-cache core app shell
+// Install: Pre-cache core app shell safely
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_PRECACHE_URLS);
+      return Promise.allSettled(
+        STATIC_PRECACHE_URLS.map((url) => cache.add(url).catch((err) => console.warn('Precache skip:', url, err)))
+      );
     }).then(() => self.skipWaiting())
   );
 });
