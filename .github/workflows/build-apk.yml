@@ -4,14 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'src/**'
-      - 'public/**'
-      - 'android/**'
-      - 'index.html'
-      - 'capacitor.config.json'
-      - 'package.json'
-      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
@@ -34,9 +26,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+          cache: 'gradle'
 
       - name: Install Node Dependencies
         run: npm ci
@@ -47,15 +37,19 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
       - name: Make Gradlew Executable
         run: chmod +x ./android/gradlew
 
       - name: Build Android APK with Gradle
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Rename and Prepare APK
+      - name: Prepare APK Output
         run: |
           mkdir -p output
           cp android/app/build/outputs/apk/debug/app-debug.apk output/Annoying-Ayush.apk
@@ -66,4 +60,3 @@ jobs:
           name: Annoying-Ayush-APK
           path: output/Annoying-Ayush.apk
           retention-days: 30
-
