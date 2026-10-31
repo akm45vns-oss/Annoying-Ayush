@@ -16,6 +16,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Ayush 💕" />
     <meta name="application-name" content="Ayush 💕" />
+    <script>
+      // Early capture of install prompt before React bundle loads
+      window.__deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__deferredPrompt = e;
+        window.dispatchEvent(new Event('app-install-prompt-ready'));
+      });
+    </script>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -13,6 +13,7 @@ import RoomPanel from './components/RoomPanel';
 import ProfilePanel from './components/ProfilePanel';
 import DailyRewardModal from './components/DailyRewardModal';
 import OnboardingModal from './components/OnboardingModal';
+import InstallModal from './components/InstallModal';
 import { soundManager } from './utils/audioEffects';
 import { voiceEngine } from './utils/voiceRecorder';
 import { clonedVoiceEngine } from './utils/clonedVoiceEngine';
@@ -51,6 +52,7 @@ export default function App() {
   const [activeNav, setActiveNav] = useState('home'); // 'home' | 'wardrobe' | 'activities' | 'room' | 'profile'
   const [isDailyRewardOpen, setIsDailyRewardOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => !settings.tutorialCompleted);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSecretLetterOpen, setIsSecretLetterOpen] = useState(false);
   const [unlockReason, setUnlockReason] = useState('secretHeart');
@@ -74,16 +76,32 @@ export default function App() {
   const [listeningState, setListeningState] = useState(() => talkingTomController.state);
   const [micErrorMessage, setMicErrorMessage] = useState('');
   const [captionText, setCaptionText] = useState('');
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [deferredPrompt, setDeferredPrompt] = useState(() => (
+    typeof window !== 'undefined' && window.__deferredPrompt ? window.__deferredPrompt : null
+  ));
 
   // Capture PWA install prompt for home screen installation on Android/Chrome
   useEffect(() => {
     const handleBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      if (typeof window !== 'undefined') {
+        window.__deferredPrompt = e;
+      }
     };
+
+    const handlePromptReady = () => {
+      if (typeof window !== 'undefined' && window.__deferredPrompt) {
+        setDeferredPrompt(window.__deferredPrompt);
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('app-install-prompt-ready', handlePromptReady);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('app-install-prompt-ready', handlePromptReady);
+    };
   }, []);
 
   // Authoritative active status: True whenever continuous voice engine is running
@@ -706,16 +724,24 @@ export default function App() {
     showSpeech(formatDialogue("Chat history cleared! ✨", settings.gfName, settings.ayushName), 2200);
   }, [settings.gfName, settings.ayushName, showSpeech]);
 
-  const handleInstallApp = useCallback(async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    try {
-      const choice = await deferredPrompt.userChoice;
-      if (choice && choice.outcome === 'accepted') {
-        showSpeech(formatDialogue("Yay! Installed to your phone! 📲💖", settings.gfName, settings.ayushName), 3000);
-      }
-    } catch {}
-    setDeferredPrompt(null);
+  const handleInstallApp = useCallback(() => {
+    if (deferredPrompt) {
+      soundManager.playSparkle();
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choice) => {
+        if (choice && choice.outcome === 'accepted') {
+          showSpeech(formatDialogue("Yay! Installed to your phone! 📲💖", settings.gfName, settings.ayushName), 3000);
+        }
+        setDeferredPrompt(null);
+        if (typeof window !== 'undefined') {
+          window.__deferredPrompt = null;
+        }
+      }).catch(() => {
+        setIsInstallModalOpen(true);
+      });
+    } else {
+      setIsInstallModalOpen(true);
+    }
   }, [deferredPrompt, settings.gfName, settings.ayushName, showSpeech]);
 
   return (
@@ -877,8 +903,18 @@ export default function App() {
         onResetSettings={handleResetSettings}
         onReplayTutorial={() => setIsOnboardingOpen(true)}
         onClearChat={handleClearChatHistory}
-        canInstall={!!deferredPrompt}
+        canInstall={true}
         onInstallApp={handleInstallApp}
+      />
+
+      {/* PWA & Mobile Installation Guide / One-Click Modal */}
+      <InstallModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        onPromptSuccess={() => {
+          showSpeech(formatDialogue("Yay! Installed to your phone! 📲💖", settings.gfName, settings.ayushName), 3000);
+        }}
       />
 
       {/* Secret Romantic Letter Modal */}

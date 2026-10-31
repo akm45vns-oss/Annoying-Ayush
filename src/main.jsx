@@ -10,7 +10,7 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Register PWA Service Worker for offline performance and mobile installability
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.warn('PWA ServiceWorker registration failed:', err);

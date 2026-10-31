@@ -78,4 +78,13 @@ describe('PWA & Mobile Installability Verification', () => {
       );
     }
   });
+
+  it('InstallModal component exists and is rendered in App.jsx', () => {
+    const modalPath = path.resolve(process.cwd(), 'src/components/InstallModal.jsx');
+    assert.ok(fs.existsSync(modalPath), 'InstallModal.jsx component must exist');
+
+    const appSource = fs.readFileSync(path.resolve(process.cwd(), 'src/App.jsx'), 'utf8');
+    assert.ok(appSource.includes('<InstallModal'), 'App.jsx must render InstallModal');
+  });
 });
+

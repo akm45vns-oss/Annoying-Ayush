@@ -4636,6 +4636,185 @@ html, body {
 }
 
 /* ==========================================================================
+   INSTALL MODAL STYLES
+   ========================================================================== */
+
+.install-sheet {
+  padding: 24px 20px 24px 20px;
+}
+
+.install-instant-banner {
+  background: linear-gradient(135deg, #fff0f5, #ffe4e6);
+  border: 1.5px solid #ff80ab;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.instant-banner-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.instant-sparkle {
+  color: #e91e63;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.instant-banner-text strong {
+  font-size: 0.95rem;
+  color: #880e4f;
+  display: block;
+}
+
+.instant-banner-text p {
+  margin: 2px 0 0 0;
+  font-size: 0.8rem;
+  color: #4a154b;
+}
+
+.instant-install-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #ff4081, #e91e63);
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(233, 30, 99, 0.35);
+  transition: all 0.2s ease;
+}
+
+.instant-install-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(233, 30, 99, 0.45);
+}
+
+.install-tabs {
+  display: flex;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.install-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.install-tab-btn.active {
+  background: #ffffff;
+  color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.install-steps-container {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px 14px;
+  margin-bottom: 16px;
+}
+
+.install-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.install-step-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.step-desc {
+  font-size: 0.85rem;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.step-desc strong {
+  color: #0f172a;
+}
+
+.inline-icon {
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--color-primary);
+  margin: 0 2px;
+}
+
+.install-footer {
+  display: flex;
+  justify-content: center;
+}
+
+.copy-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-link-btn:hover {
+  background: #f1f5f9;
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ==========================================================================
    DESKTOP RESPONSIVE LAYOUT
    ========================================================================== */
 
