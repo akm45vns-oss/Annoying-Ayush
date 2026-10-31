@@ -74,6 +74,17 @@ export default function App() {
   const [listeningState, setListeningState] = useState(() => talkingTomController.state);
   const [micErrorMessage, setMicErrorMessage] = useState('');
   const [captionText, setCaptionText] = useState('');
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  // Capture PWA install prompt for home screen installation on Android/Chrome
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
 
   // Authoritative active status: True whenever continuous voice engine is running
   const isListening = listeningState === LISTENING_STATES.LISTENING ||
@@ -695,6 +706,18 @@ export default function App() {
     showSpeech(formatDialogue("Chat history cleared! ✨", settings.gfName, settings.ayushName), 2200);
   }, [settings.gfName, settings.ayushName, showSpeech]);
 
+  const handleInstallApp = useCallback(async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    try {
+      const choice = await deferredPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        showSpeech(formatDialogue("Yay! Installed to your phone! 📲💖", settings.gfName, settings.ayushName), 3000);
+      }
+    } catch {}
+    setDeferredPrompt(null);
+  }, [deferredPrompt, settings.gfName, settings.ayushName, showSpeech]);
+
   return (
     <div className="game-app-wrapper">
       <main className="game-container">
@@ -854,6 +877,8 @@ export default function App() {
         onResetSettings={handleResetSettings}
         onReplayTutorial={() => setIsOnboardingOpen(true)}
         onClearChat={handleClearChatHistory}
+        canInstall={!!deferredPrompt}
+        onInstallApp={handleInstallApp}
       />
 
       {/* Secret Romantic Letter Modal */}

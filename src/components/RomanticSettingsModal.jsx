@@ -15,7 +15,8 @@ import {
   Sliders,
   Shield,
   HelpCircle,
-  Trash2
+  Trash2,
+  Download
 } from 'lucide-react';
 import { DEFAULT_SETTINGS, calculateDaysTogether } from '../utils/romanticSettings';
 import { soundManager } from '../utils/audioEffects';
@@ -28,7 +29,9 @@ export default function RomanticSettingsModal({
   onSaveSettings,
   onResetSettings,
   onReplayTutorial = () => {},
-  onClearChat = () => {}
+  onClearChat = () => {},
+  canInstall = false,
+  onInstallApp = () => {}
 }) {
   const [formData, setFormData] = useState(settings);
   const [prevSettings, setPrevSettings] = useState(settings);
@@ -682,6 +685,21 @@ export default function RomanticSettingsModal({
             </div>
 
             <div className="data-actions-row">
+              {canInstall && (
+                <button
+                  type="button"
+                  className="action-pill-btn install-app-btn"
+                  onClick={() => {
+                    soundManager.playSparkle();
+                    onInstallApp();
+                  }}
+                  title="Install Annoying Ayush to phone home screen"
+                >
+                  <Download size={14} />
+                  <span>Install App 📲</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 className="action-pill-btn tutorial-btn"

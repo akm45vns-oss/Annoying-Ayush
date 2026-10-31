@@ -1,0 +1,57 @@
+{
+  "name": "Annoying Ayush - Your Pocket Companion",
+  "short_name": "Ayush 💕",
+  "description": "Interactive 3D Talking Tom-style virtual companion with voice repeat, AI chat, 8 mini-games, and 3D wardrobe.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff5f7",
+  "theme_color": "#ffccd5",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["entertainment", "games"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Talk to Ayush",
+      "short_name": "Voice",
+      "description": "Speak to Ayush and hear him repeat",
+      "url": "/?mode=voice",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mini-Games Hub",
+      "short_name": "Games",
+      "description": "Play romantic arcade mini-games",
+      "url": "/?tab=games",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

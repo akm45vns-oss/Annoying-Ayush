@@ -4619,6 +4619,17 @@ html, body {
   color: #be185d;
 }
 
+.install-app-btn {
+  background: linear-gradient(135deg, #fff0f5, #ffe4e6);
+  border-color: #ff69b4;
+  color: #db2777;
+}
+
+.install-app-btn:hover {
+  background: linear-gradient(135deg, #ffe4e6, #fecdd3);
+  transform: translateY(-1px);
+}
+
 .clear-chat-btn:hover {
   background: #fef2f2;
   color: #b91c1c;
