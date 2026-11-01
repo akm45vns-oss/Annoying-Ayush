@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     name: Build Android Debug APK
@@ -61,3 +64,23 @@ jobs:
           name: Annoying-Ayush-APK
           path: output/Annoying-Ayush.apk
           retention-days: 30
+
+      - name: Publish Direct APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-apk
+          name: "Annoying Ayush Android APK"
+          body: |
+            ### 📱 Annoying Ayush Native Android APK
+            
+            Direct downloadable `.apk` file for Android phones and tablets.
+            
+            **How to install on Android:**
+            1. Tap `Annoying-Ayush.apk` below to download directly to your phone.
+            2. Tap the downloaded `.apk` file to install.
+            3. If prompted, allow "Install unknown apps" from Settings.
+          files: output/Annoying-Ayush.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

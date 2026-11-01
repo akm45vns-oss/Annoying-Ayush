@@ -55,7 +55,7 @@ export default function InstallModal({
 
   const handleDownloadApk = () => {
     soundManager.playSparkle();
-    window.open('https://github.com/akm45vns-oss/Annoying-Ayush/actions', '_blank');
+    window.open('https://github.com/akm45vns-oss/Annoying-Ayush/releases/download/android-apk/Annoying-Ayush.apk', '_blank');
   };
 
   const handleCopyLink = () => {
