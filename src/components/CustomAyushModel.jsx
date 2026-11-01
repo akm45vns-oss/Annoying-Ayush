@@ -585,9 +585,9 @@ export default function CustomAyushModel({
       }
     }
 
-    // Sync head accessories anchor to head bone rotation & neck base pivot (y=1.00, z=0.02)
+    // Sync head accessories anchor to head bone rotation (y=1.05, z=0.04)
     if (bones.head && headAnchorRef.current) {
-      headAnchorRef.current.position.set(0, 1.00, 0.02);
+      headAnchorRef.current.position.set(0, 1.05, 0.04);
       headAnchorRef.current.rotation.x = bones.head.rotation.x;
       headAnchorRef.current.rotation.y = bones.head.rotation.y;
       headAnchorRef.current.rotation.z = bones.head.rotation.z;
