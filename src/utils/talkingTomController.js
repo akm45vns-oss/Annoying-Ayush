@@ -96,6 +96,7 @@ export class TalkingTomController {
     // Callbacks & Event Listeners
     this.onStateChange = null;
     this.onPhraseFinalized = null;
+    this.onAudioRecorded = null;
     this.onError = null;
     this.onInterimResult = null;
     this.stateListeners = new Set();
@@ -130,10 +131,18 @@ export class TalkingTomController {
     this.stateListeners.delete(fn);
   }
 
-  isSupported() {
+  hasSpeechRecognition() {
     return typeof window !== 'undefined' && !!(
       window.SpeechRecognition ||
       window.webkitSpeechRecognition
+    );
+  }
+
+  isSupported() {
+    if (typeof window === 'undefined') return false;
+    return !!(
+      this.hasSpeechRecognition() ||
+      (typeof navigator !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function' && typeof window.MediaRecorder !== 'undefined')
     );
   }
 
@@ -240,7 +249,7 @@ export class TalkingTomController {
     if (!this.isSupported()) {
       this.setState(LISTENING_STATES.ERROR, {
         error: 'unsupported',
-        message: 'Speech recognition is not supported in this browser. Try Chrome or Edge.'
+        message: 'Speech recognition or microphone recording is not supported in this browser.'
       });
       return false;
     }
@@ -262,15 +271,20 @@ export class TalkingTomController {
     const currentGen = this.sessionGeneration;
     this.clearAllTimers();
 
-    if (!this.initRecognition()) {
-      this.setState(LISTENING_STATES.ERROR, {
-        error: 'init_failed',
-        message: 'Could not initialize speech recognition.'
-      });
-      return false;
+    if (this.hasSpeechRecognition()) {
+      if (!this.initRecognition()) {
+        this.setState(LISTENING_STATES.ERROR, {
+          error: 'init_failed',
+          message: 'Could not initialize speech recognition.'
+        });
+        return false;
+      }
+      this.attemptRecognitionStart(currentGen);
+      return true;
     }
 
-    this.attemptRecognitionStart(currentGen);
+    // Fallback: Audio VAD Listening on native Android WebView / Capacitor / mobile
+    this.startAudioVadListening(currentGen);
     return true;
   }
 
@@ -293,6 +307,7 @@ export class TalkingTomController {
         this.recognition.abort();
       } catch {}
     }
+    this.stopAudioVad();
 
     this.currentInterimText = '';
     this.setState(LISTENING_STATES.IDLE);
@@ -314,6 +329,8 @@ export class TalkingTomController {
         this.recognition.abort();
       } catch {}
     }
+    this.stopAudioVad();
+
     this.currentInterimText = '';
     this.setState(LISTENING_STATES.PAUSED);
   }
@@ -327,7 +344,11 @@ export class TalkingTomController {
     this.sessionGeneration++;
     const currentGen = this.sessionGeneration;
     this.clearAllTimers();
-    this.attemptRecognitionStart(currentGen);
+    if (this.hasSpeechRecognition()) {
+      this.attemptRecognitionStart(currentGen);
+    } else {
+      this.startAudioVadListening(currentGen);
+    }
   }
 
   /**
@@ -350,12 +371,211 @@ export class TalkingTomController {
       if (currentGen !== this.sessionGeneration) return;
       if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING) return;
 
-      if (this.isRecognitionActive) {
-        this.setState(LISTENING_STATES.LISTENING);
+      if (this.hasSpeechRecognition()) {
+        if (this.isRecognitionActive) {
+          this.setState(LISTENING_STATES.LISTENING);
+        } else {
+          this.attemptRecognitionStart(currentGen);
+        }
       } else {
-        this.attemptRecognitionStart(currentGen);
+        this.startAudioVadListening(currentGen);
       }
     }, delayMs);
+  }
+
+  /**
+   * Stop active audio VAD and release microphone tracks
+   */
+  stopAudioVad() {
+    if (this.vadInterval) {
+      clearInterval(this.vadInterval);
+      this.vadInterval = null;
+    }
+    if (this.vadMediaRecorder && this.vadMediaRecorder.state !== 'inactive') {
+      try {
+        this.vadMediaRecorder.stop();
+      } catch {}
+    }
+    this.vadMediaRecorder = null;
+    if (this.vadStream) {
+      try {
+        this.vadStream.getTracks().forEach((t) => t.stop());
+      } catch {}
+      this.vadStream = null;
+    }
+    if (this.vadAudioCtx) {
+      try {
+        this.vadAudioCtx.close();
+      } catch {}
+      this.vadAudioCtx = null;
+    }
+    this.isVadRecording = false;
+    this.vadChunks = [];
+  }
+
+  /**
+   * Fallback for native Android WebView / Mobile browsers lacking SpeechRecognition:
+   * Uses Web Audio VAD & MediaRecorder for true Talking Tom recording & pitch-shift repetition!
+   */
+  async startAudioVadListening(generation = this.sessionGeneration) {
+    if (generation !== this.sessionGeneration) return;
+    if (!this.isExplicitlyEnabled) return;
+    if (this.state === LISTENING_STATES.SPEAKING) return;
+
+    this.stopAudioVad();
+
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      this.setState(LISTENING_STATES.ERROR, {
+        error: 'unsupported',
+        message: 'Audio recording is not supported in this environment.'
+      });
+      return;
+    }
+
+    try {
+      this.setState(LISTENING_STATES.STARTING, { message: 'Accessing microphone...' });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      if (generation !== this.sessionGeneration || !this.isExplicitlyEnabled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      this.vadStream = stream;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        try {
+          this.vadAudioCtx = new AudioCtx();
+          if (this.vadAudioCtx.state === 'suspended') {
+            await this.vadAudioCtx.resume().catch(() => {});
+          }
+          const source = this.vadAudioCtx.createMediaStreamSource(stream);
+          this.vadAnalyser = this.vadAudioCtx.createAnalyser();
+          this.vadAnalyser.fftSize = 256;
+          source.connect(this.vadAnalyser);
+        } catch {}
+      }
+
+      this.initVadMediaRecorder(stream);
+      this.startVadMonitor(generation);
+      this.setState(LISTENING_STATES.LISTENING, { message: 'Ayush is listening!' });
+    } catch (err) {
+      if (generation !== this.sessionGeneration) return;
+      console.warn('Audio VAD error:', err);
+      const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+      this.setState(LISTENING_STATES.ERROR, {
+        error: isDenied ? 'not-allowed' : 'audio-capture',
+        message: isDenied
+          ? 'Microphone access denied. Please grant microphone permission so Ayush can hear you!'
+          : 'Could not access microphone.'
+      });
+    }
+  }
+
+  initVadMediaRecorder(stream) {
+    this.vadChunks = [];
+    let selectedMime = '';
+    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+      const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'];
+      for (const t of candidates) {
+        if (MediaRecorder.isTypeSupported(t)) {
+          selectedMime = t;
+          break;
+        }
+      }
+    }
+    const options = selectedMime ? { mimeType: selectedMime } : {};
+    try {
+      this.vadMediaRecorder = new MediaRecorder(stream, options);
+      this.vadMediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          this.vadChunks.push(e.data);
+        }
+      };
+      this.vadMediaRecorder.onstop = async () => {
+        if (this.vadChunks.length > 0) {
+          const blob = new Blob(this.vadChunks, { type: selectedMime || 'audio/webm' });
+          this.vadChunks = [];
+          if (blob.size > 1500) {
+            this.handleAudioPhraseCaptured(blob);
+          } else if (this.isExplicitlyEnabled && this.state !== LISTENING_STATES.SPEAKING) {
+            this.setState(LISTENING_STATES.LISTENING);
+          }
+        }
+      };
+    } catch (e) {
+      console.warn('MediaRecorder init error in VAD:', e);
+    }
+  }
+
+  startVadMonitor(generation) {
+    if (this.vadInterval) clearInterval(this.vadInterval);
+    if (!this.vadAnalyser) return;
+
+    const dataArray = new Uint8Array(this.vadAnalyser.frequencyBinCount);
+    let consecutiveSpeechFrames = 0;
+    let consecutiveSilenceFrames = 0;
+
+    this.vadInterval = setInterval(() => {
+      if (generation !== this.sessionGeneration || !this.isExplicitlyEnabled) {
+        clearInterval(this.vadInterval);
+        return;
+      }
+      if (this.state === LISTENING_STATES.SPEAKING) return;
+
+      this.vadAnalyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+      const volume = sum / dataArray.length / 255;
+
+      if (volume > 0.07) {
+        consecutiveSpeechFrames++;
+        consecutiveSilenceFrames = 0;
+
+        if (consecutiveSpeechFrames >= 2 && !this.isVadRecording) {
+          this.isVadRecording = true;
+          this.vadChunks = [];
+          if (this.vadMediaRecorder && this.vadMediaRecorder.state === 'inactive') {
+            try { this.vadMediaRecorder.start(100); } catch {}
+          }
+          this.setState(LISTENING_STATES.PROCESSING, { message: 'Hearing your voice...' });
+        }
+      } else {
+        consecutiveSpeechFrames = 0;
+        if (this.isVadRecording) {
+          consecutiveSilenceFrames++;
+          if (consecutiveSilenceFrames >= 16) {
+            this.isVadRecording = false;
+            if (this.vadMediaRecorder && this.vadMediaRecorder.state === 'recording') {
+              try { this.vadMediaRecorder.stop(); } catch {}
+            }
+          }
+        }
+      }
+    }, 50);
+  }
+
+  async handleAudioPhraseCaptured(blob) {
+    this.setState(LISTENING_STATES.PROCESSING, { message: 'Repeating your voice!' });
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new AudioCtx();
+      const decoded = await ctx.decodeAudioData(arrayBuffer);
+      if (typeof this.onAudioRecorded === 'function') {
+        this.onAudioRecorded(decoded, blob);
+      }
+    } catch (err) {
+      console.warn('Audio decode error in VAD:', err);
+      if (this.isExplicitlyEnabled) {
+        this.scheduleRestart(400, 'decode_error');
+      }
+    }
   }
 
   /**
@@ -702,6 +922,7 @@ export class TalkingTomController {
     this.recognition = null;
     this.onStateChange = null;
     this.onPhraseFinalized = null;
+    this.onAudioRecorded = null;
     this.onError = null;
     this.onInterimResult = null;
   }

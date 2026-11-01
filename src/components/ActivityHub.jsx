@@ -104,56 +104,58 @@ export default function ActivityHub({
 
   return (
     <>
-      <div className="bottom-sheet-backdrop" onClick={onClose}>
-        <div 
-          className="bottom-sheet-card activity-hub-sheet"
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Activities and Mini-Games"
-        >
-          <div className="sheet-handle" />
+      {!activeGameId && (
+        <div className="bottom-sheet-backdrop" onClick={onClose}>
+          <div 
+            className="bottom-sheet-card activity-hub-sheet"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Activities and Mini-Games"
+          >
+            <div className="sheet-handle" />
 
-          <div className="sheet-header">
-            <div className="sheet-title-group">
-              <h2 className="sheet-title">Mini-Games & Fun 🎮</h2>
-              <p className="sheet-subtitle">Earn coins & affection by playing with {ayushName}!</p>
-            </div>
-            <button 
-              type="button" 
-              className="sheet-close-btn" 
-              onClick={onClose}
-              aria-label="Close activities hub"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          <div className="activities-grid">
-            {ACTIVITIES_LIST.map((act) => (
-              <div key={act.id} className="activity-card">
-                <div className="activity-icon-wrap" style={{ backgroundColor: act.color + '22' }}>
-                  <span className="activity-emoji">{act.icon}</span>
-                </div>
-                <div className="activity-info">
-                  <h4 className="activity-name">{act.title}</h4>
-                  <p className="activity-desc">{act.desc}</p>
-                  <span className="activity-reward">🪙 {act.reward}</span>
-                </div>
-                <button
-                  type="button"
-                  className="activity-play-btn"
-                  onClick={() => handleLaunchGame(act.id)}
-                  aria-label={`Play ${act.title}`}
-                >
-                  <Play size={16} fill="currentColor" />
-                  <span>Play</span>
-                </button>
+            <div className="sheet-header">
+              <div className="sheet-title-group">
+                <h2 className="sheet-title">Mini-Games & Fun 🎮</h2>
+                <p className="sheet-subtitle">Earn coins & affection by playing with {ayushName}!</p>
               </div>
-            ))}
+              <button 
+                type="button" 
+                className="sheet-close-btn" 
+                onClick={onClose}
+                aria-label="Close activities hub"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="activities-grid">
+              {ACTIVITIES_LIST.map((act) => (
+                <div key={act.id} className="activity-card">
+                  <div className="activity-icon-wrap" style={{ backgroundColor: act.color + '22' }}>
+                    <span className="activity-emoji">{act.icon}</span>
+                  </div>
+                  <div className="activity-info">
+                    <h4 className="activity-name">{act.title}</h4>
+                    <p className="activity-desc">{act.desc}</p>
+                    <span className="activity-reward">🪙 {act.reward}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="activity-play-btn"
+                    onClick={() => handleLaunchGame(act.id)}
+                    aria-label={`Play ${act.title}`}
+                  >
+                    <Play size={16} fill="currentColor" />
+                    <span>Play</span>
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ACTIVE MODAL MINI-GAME */}
       {activeGameId === 'tap_challenge' && (

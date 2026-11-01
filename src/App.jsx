@@ -265,9 +265,9 @@ export default function App() {
   }, []);
 
   // Talking Tom Continuous Repeat Loop:
-  // When user finishes a phrase, Ayush repeats it using the Free Indian Male Voice Engine,
+  // When user finishes a phrase, Ayush repeats it using either the selected voice mode (text)
+  // or native Talking Tom pitch-shifted audio recording (mobile/Android WebView fallback),
   // then resumes listening after a feedback-preventing cooldown.
-  // Requirement 5: Do NOT show transcript or subtitles in SpeechBubble!
   useEffect(() => {
     talkingTomController.onPhraseFinalized = (phrase) => {
       talkingTomController.setSpeaking(true);
@@ -277,8 +277,9 @@ export default function App() {
         setCaptionText(`"${phrase}"`);
       }
 
-      // Permanently use Free Indian Male Voice Engine ('device' mode) for speech repetition
-      clonedVoiceEngine.speakPhraseWithMode(phrase, 'device', {
+      // Respect the user's selected voice mode: 'funny' (cartoon pitch) | 'device' (Indian male) | 'cloned'
+      const activeVoiceMode = settings.voiceMode || 'funny';
+      clonedVoiceEngine.speakPhraseWithMode(phrase, activeVoiceMode, {
         onStart: () => {
           handlePlaybackStart();
         },
@@ -299,10 +300,33 @@ export default function App() {
       });
     };
 
+    // Native Talking Tom audio repeat fallback (for Android APK / WebViews lacking SpeechRecognition)
+    talkingTomController.onAudioRecorded = (audioBuffer) => {
+      talkingTomController.setSpeaking(true);
+      handlePlaybackStart();
+      voiceEngine.audioBuffer = audioBuffer;
+      const playMode = settings.voiceMode === 'device' ? 'original' : 'funny';
+      try {
+        voiceEngine.playRecording(
+          playMode,
+          (vol) => handleAmplitude(vol),
+          () => {
+            handlePlaybackEnd();
+            talkingTomController.setSpeaking(false, 450);
+          }
+        );
+      } catch (err) {
+        console.warn('voiceEngine.playRecording error:', err);
+        handlePlaybackEnd();
+        talkingTomController.setSpeaking(false, 450);
+      }
+    };
+
     return () => {
       talkingTomController.onPhraseFinalized = null;
+      talkingTomController.onAudioRecorded = null;
     };
-  }, [handlePlaybackStart, handleAmplitude, handlePlaybackEnd, settings.captionsEnabled]);
+  }, [handlePlaybackStart, handleAmplitude, handlePlaybackEnd, settings.captionsEnabled, settings.voiceMode]);
 
   // Pause continuous repeat during AI Chat to prevent audio competition (strictly on tab transition)
   useEffect(() => {
@@ -321,6 +345,7 @@ export default function App() {
     soundManager.playPop();
     setMicErrorMessage('');
     clonedVoiceEngine.unlockAudio();
+    voiceEngine.getAudioContext();
     talkingTomController.startListening();
   }, []);
 
@@ -331,6 +356,7 @@ export default function App() {
       talkingTomController.stopListening();
     } else {
       clonedVoiceEngine.unlockAudio();
+      voiceEngine.getAudioContext();
       talkingTomController.startListening();
     }
   }, []);
@@ -795,18 +821,30 @@ export default function App() {
             onDoubleTap={handleDoubleTap}
           />
 
-          {/* Single clear start/permission prompt when hands-free listening is not active */}
-          {!isListening && activeTab !== 'chat' && (
+          {/* Hands-free listening status & toggle */}
+          {activeTab !== 'chat' && (
             <div className="tom-start-prompt-wrap">
-              <button
-                type="button"
-                className="tom-start-prompt-btn"
-                onClick={handleStartListening}
-                aria-label="Tap to talk to Ayush"
-              >
-                <Mic size={16} className="prompt-mic-icon" />
-                <span>Tap to Talk to Ayush 🎙️</span>
-              </button>
+              {!isListening ? (
+                <button
+                  type="button"
+                  className="tom-start-prompt-btn"
+                  onClick={handleStartListening}
+                  aria-label="Tap to talk to Ayush"
+                >
+                  <Mic size={16} className="prompt-mic-icon" />
+                  <span>Tap to Talk to Ayush 🎙️</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="tom-start-prompt-btn listening-active"
+                  onClick={handleToggleListening}
+                  aria-label="Ayush is listening. Tap to pause."
+                >
+                  <span className="listening-pulse-dot" />
+                  <span>Ayush is Listening... (Tap to Pause)</span>
+                </button>
+              )}
               {micErrorMessage && (
                 <p className="tom-mic-error-pill">{micErrorMessage}</p>
               )}

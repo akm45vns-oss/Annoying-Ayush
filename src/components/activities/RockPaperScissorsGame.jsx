@@ -83,6 +83,7 @@ export default function RockPaperScissorsGame({ onFinish, onClose, gfName = 'Bab
                   key={c.id}
                   type="button"
                   className="rps-choice-btn"
+                  onPointerDown={() => handlePlay(c.id)}
                   onClick={() => handlePlay(c.id)}
                 >
                   <span className="rps-emoji">{c.emoji}</span>

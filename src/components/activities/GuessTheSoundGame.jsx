@@ -146,6 +146,7 @@ export default function GuessTheSoundGame({ onFinish, onClose, gfName = 'Babe' }
                     key={opt.id}
                     type="button"
                     className={`sound-option-card ${statusClass}`}
+                    onPointerDown={() => handleSelectOption(opt)}
                     onClick={() => handleSelectOption(opt)}
                     disabled={isAnswered}
                   >

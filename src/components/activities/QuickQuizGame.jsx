@@ -129,6 +129,7 @@ export default function QuickQuizGame({
                     type="button"
                     className={`quiz-option-btn ${statusClass}`}
                     onClick={() => handleSelectAnswer(idx)}
+                    onPointerDown={(e) => { e.preventDefault(); handleSelectAnswer(idx); }}
                     disabled={isAnswered}
                   >
                     <span className="quiz-option-label">{String.fromCharCode(65 + idx)}.</span>

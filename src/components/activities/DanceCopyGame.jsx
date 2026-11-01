@@ -106,6 +106,7 @@ export default function DanceCopyGame({ onFinish, onClose, gfName = 'Babe', ayus
                   key={m.id}
                   type="button"
                   className={`dance-btn ${activeHighlight === m.id ? 'highlighted' : ''}`}
+                  onPointerDown={() => handlePlayerMove(m.id)}
                   onClick={() => handlePlayerMove(m.id)}
                   disabled={turn !== 'repeat'}
                 >

@@ -83,6 +83,7 @@ export default function MemoryMatchGame({ onFinish, onClose, gfName = 'Babe' }) 
                   key={card.id}
                   type="button"
                   className={`memory-card ${isRevealed ? 'flipped' : ''} ${matched.includes(idx) ? 'matched' : ''}`}
+                  onPointerDown={() => handleCardClick(idx)}
                   onClick={() => handleCardClick(idx)}
                   aria-label={`Card ${idx + 1}`}
                 >

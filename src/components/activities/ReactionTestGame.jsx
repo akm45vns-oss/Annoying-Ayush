@@ -74,6 +74,7 @@ export default function ReactionTestGame({ onFinish, onClose, gfName = 'Babe' })
 
         <div 
           className={`reaction-arena ${state}`}
+          onPointerDown={handleClickArena}
           onClick={handleClickArena}
         >
           {state === 'waiting' && (

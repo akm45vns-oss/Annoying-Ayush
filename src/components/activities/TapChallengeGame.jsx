@@ -99,6 +99,7 @@ export default function TapChallengeGame({ onFinish, onClose, gfName = 'Babe' })
               key={target.id}
               className="challenge-tap-target bounce-pop"
               style={{ left: `${target.x}%`, top: `${target.y}%` }}
+              onPointerDown={handleTapTarget}
               onClick={handleTapTarget}
               aria-label="Tap target"
             >

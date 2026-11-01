@@ -97,6 +97,7 @@ export default function BubblePopGame({ onFinish, onClose, gfName = 'Babe' }) {
                   borderColor: b.color,
                   animationDuration: `${b.speed}s`
                 }}
+                onPointerDown={() => handlePopBubble(b.id)}
                 onClick={() => handlePopBubble(b.id)}
                 aria-label="Pop bubble"
               >
