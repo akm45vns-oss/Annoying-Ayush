@@ -1,18 +1,13 @@
 /**
- * Bounded In-Memory Rate Limiter for Serverless Handlers
+ * Bounded In-Memory Rate Limiter with Global Aggregate Cap Protection
  * 
- * ARCHITECTURE NOTE:
- * In serverless environments (such as Vercel Serverless Functions), this in-memory store
- * is process-local to the running instance/container. It provides local cost and flood
- * protection per execution container, but is NOT a distributed global rate limiter across
- * concurrent multi-region serverless instances.
- * 
- * MEMORY POLICY:
- * - Stale records whose time window has expired are automatically pruned.
- * - A strict upper bound (maxEntries) is enforced.
- * - When capacity is reached and all current entries are active (unexpired), the limiter
- *   uses an explicit capacity rejection policy (HTTP 503) rather than silently evicting
- *   active clients (which would reset their limits and permit bypass).
+ * ARCHITECTURE & DEFENSE-IN-DEPTH:
+ * 1. Enforces per-client IP sliding window rate limiting.
+ * 2. Enforces a strict Global Aggregate Cap across all incoming clients within the window
+ *    to prevent distributed multi-IP attacks from exhausting backend AI/voice provider quotas.
+ * 3. Enforces an explicit capacity rejection policy (HTTP 503) when map entries hit maxEntries
+ *    to prevent memory exhaustion and prevent active rate-limit state evictions.
+ * 4. Automatic opportunistic pruning of expired client records.
  */
 
 /**
@@ -48,21 +43,25 @@ export function getClientIp(req) {
 }
 
 /**
- * Creates an in-memory rate limiter with explicit bounding and window expiry.
+ * Creates an in-memory rate limiter with explicit bounding, window expiry, and global aggregate cap.
  * 
  * @param {Object} options
  * @param {number} [options.windowMs=60000] - Window duration in milliseconds (default 1 minute)
- * @param {number} [options.maxRequests=25] - Maximum permitted requests per client in the window
+ * @param {number} [options.maxRequests=25] - Maximum permitted requests per client IP in the window
  * @param {number} [options.maxEntries=1000] - Maximum unique active client records allowed in memory
- * @param {string} [options.name='default'] - Identifying label for logging/diagnostics
+ * @param {number} [options.globalMaxRequests=500] - Aggregate global ceiling across all callers in window
+ * @param {string} [options.name='rate-limiter'] - Identifying label for logging/diagnostics
  */
 export function createRateLimiter({
   windowMs = 60 * 1000,
   maxRequests = 25,
   maxEntries = 1000,
+  globalMaxRequests = 500,
   name = 'rate-limiter'
 } = {}) {
   const map = new Map();
+  let globalCount = 0;
+  let globalWindowStart = Date.now();
 
   /**
    * Remove records whose window has elapsed.
@@ -90,6 +89,20 @@ export function createRateLimiter({
     const now = Date.now();
     const clientKey = String(ip || 'unknown').trim();
 
+    // Check Global Aggregate Window
+    if (now - globalWindowStart > windowMs) {
+      globalCount = 0;
+      globalWindowStart = now;
+    }
+
+    if (globalCount >= globalMaxRequests) {
+      return {
+        allowed: false,
+        status: 429,
+        error: 'Global system request limit reached. Please try again shortly.'
+      };
+    }
+
     // Periodic opportunistic cleanup when map contains entries
     if (map.size > 100) {
       prune(now);
@@ -103,6 +116,7 @@ export function createRateLimiter({
         // Window expired: start a new window
         record.count = 1;
         record.startTime = now;
+        globalCount++;
         return { allowed: true, status: 200 };
       }
 
@@ -115,6 +129,7 @@ export function createRateLimiter({
       }
 
       record.count += 1;
+      globalCount++;
       return { allowed: true, status: 200 };
     }
 
@@ -135,6 +150,7 @@ export function createRateLimiter({
 
     // Allocate new record
     map.set(clientKey, { count: 1, startTime: now });
+    globalCount++;
     return { allowed: true, status: 200 };
   }
 
@@ -143,6 +159,8 @@ export function createRateLimiter({
    */
   function reset() {
     map.clear();
+    globalCount = 0;
+    globalWindowStart = Date.now();
   }
 
   /**
@@ -152,14 +170,23 @@ export function createRateLimiter({
     return map.size;
   }
 
+  /**
+   * Get global count in current window
+   */
+  function getGlobalCount() {
+    return globalCount;
+  }
+
   return {
     check,
     prune,
     reset,
     size,
+    getGlobalCount,
     windowMs,
     maxRequests,
     maxEntries,
+    globalMaxRequests,
     name
   };
 }

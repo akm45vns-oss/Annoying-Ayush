@@ -7,19 +7,22 @@
  * - Graceful unconfigured / timeout response informing client to use browser speech synthesis
  * 
  * Security & Reliability:
- * - API keys are strictly read from process.env on the server.
- * - In-memory bounded rate limiter per IP to prevent quota abuse.
+ * - Application authentication & origin verification.
+ * - Anti-Impersonation & Social Engineering safety policy guard.
+ * - In-memory bounded rate limiter per IP with global aggregate quota cap.
  * - Coordinated overall server-side deadline (14s) ensuring provider attempts
  *   and failovers fit within serverless execution limits without hanging.
  */
 
 import { createRateLimiter, getClientIp } from './rateLimiter.js';
+import { verifyApiAccess } from './authMiddleware.js';
 
-// Process-local bounded rate limiter for voice generation (20 requests/minute per client IP)
+// Process-local bounded rate limiter for voice generation (20 requests/minute per client IP, global cap 300)
 export const ttsRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   maxRequests: 20,
   maxEntries: 1000,
+  globalMaxRequests: 300,
   name: 'tts'
 });
 
@@ -29,6 +32,33 @@ const ELEVENLABS_MAX_TIMEOUT_MS = 8000;
 const OPENAI_MIN_RESERVE_MS = 3500;
 const OPENAI_MAX_TIMEOUT_MS = 5000;
 const MIN_TIME_TO_ATTEMPT_MS = 2500;
+
+/**
+ * Impersonation Risk Guard: Validates that text prompt conforms to companion dialogue rules
+ * Rejects phishing, vishing, security code, and financial exploitation attempts
+ */
+function validateTtsContent(rawText) {
+  if (typeof rawText !== 'string') {
+    return { valid: false, error: 'Text prompt must be a string.' };
+  }
+  const text = rawText.trim();
+  if (!text) {
+    return { valid: false, error: 'Text prompt cannot be empty.' };
+  }
+
+  // Bound utterance length to realistic speech bubble size
+  if (text.length > 250) {
+    return { valid: false, error: 'Text exceeds maximum companion speech length (250 characters).' };
+  }
+
+  // Anti-impersonation blacklist
+  const forbidden = /\b(password|verification code|one[- ]time password|otp|bank account|routing number|credit card|cvv|security code|wire transfer|arrest warrant|social security|irs|fbi|police alert)\b/i;
+  if (forbidden.test(text)) {
+    return { valid: false, error: 'Text violates voice companion safety policy.' };
+  }
+
+  return { valid: true, text };
+}
 
 async function parseBody(req) {
   if (req.body && typeof req.body === 'object') {
@@ -88,6 +118,15 @@ export async function handleTtsRequest(req, res) {
     return;
   }
 
+  // Authentication & Origin Check
+  const auth = verifyApiAccess(req);
+  if (!auth.authorized) {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = auth.status;
+    res.end(JSON.stringify({ ok: false, error: auth.error }));
+    return;
+  }
+
   const clientIp = getClientIp(req);
   const rateLimitResult = ttsRateLimiter.check(clientIp);
   if (!rateLimitResult.allowed) {
@@ -102,20 +141,28 @@ export async function handleTtsRequest(req, res) {
   }
 
   const body = await parseBody(req);
-  if (!body || !body.text || typeof body.text !== 'string' || !body.text.trim()) {
+  if (!body) {
     res.setHeader('Content-Type', 'application/json');
     res.statusCode = 400;
-    res.end(JSON.stringify({ ok: false, error: 'Text prompt cannot be empty.' }));
+    res.end(JSON.stringify({ ok: false, error: 'Invalid JSON request body.' }));
     return;
   }
 
-  const text = body.text.trim().slice(0, 400); // Sensible limit per spoken utterance
+  const validation = validateTtsContent(body.text);
+  if (!validation.valid) {
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: validation.error }));
+    return;
+  }
+
+  const text = validation.text;
 
   const elevenKey = (process.env.ELEVENLABS_API_KEY || '').trim();
   const elevenVoiceId = (process.env.ELEVENLABS_VOICE_ID || '').trim();
   const openaiKey = (process.env.OPENAI_API_KEY || '').trim();
 
-  // Unconfigured state: Gracefully let client know to use browser synthesis fallback
+  // Unconfigured state: Gracefully let client know to use browser voice fallback
   if ((!elevenKey || !elevenVoiceId) && !openaiKey) {
     res.setHeader('Content-Type', 'application/json');
     res.statusCode = 200;
@@ -182,18 +229,15 @@ export async function handleTtsRequest(req, res) {
   }
 
   // -------------------------------------------------------------------------
-  // TIER 2 FAILOVER: OpenAI TTS (if configured)
+  // TIER 2: OpenAI TTS Failover
   // -------------------------------------------------------------------------
   if (openaiKey) {
     const elapsed = Date.now() - requestStartTime;
-    const remainingForOpenai = SERVER_TOTAL_DEADLINE_MS - elapsed;
+    const remainingBudget = SERVER_TOTAL_DEADLINE_MS - elapsed;
 
-    if (remainingForOpenai >= MIN_TIME_TO_ATTEMPT_MS) {
-      const openaiTimeout = Math.min(OPENAI_MAX_TIMEOUT_MS, remainingForOpenai - 400);
+    if (remainingBudget >= MIN_TIME_TO_ATTEMPT_MS) {
+      const openaiTimeout = Math.min(OPENAI_MAX_TIMEOUT_MS, remainingBudget);
       try {
-        const model = process.env.OPENAI_TTS_MODEL || 'tts-1';
-        const voice = process.env.OPENAI_TTS_VOICE || 'echo'; // male/friendly tone
-
         const response = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
           headers: {
@@ -201,9 +245,9 @@ export async function handleTtsRequest(req, res) {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model,
+            model: 'tts-1',
             input: text,
-            voice
+            voice: 'onyx'
           }),
           signal: AbortSignal.timeout(openaiTimeout)
         });
@@ -219,21 +263,22 @@ export async function handleTtsRequest(req, res) {
         res.end(Buffer.from(audioBuffer));
         return;
       } catch (err) {
-        console.warn('OpenAI TTS failed or timed out:', err.message);
+        console.warn('OpenAI TTS generation failed:', err.message);
       }
-    } else {
-      console.warn('Insufficient remaining deadline for OpenAI TTS failover.');
     }
   }
 
-  // If external generation failed or overall budget expired, return fallback payload
+  // -------------------------------------------------------------------------
+  // TIER 3: Failover to Client Speech Synthesis
+  // -------------------------------------------------------------------------
   res.setHeader('Content-Type', 'application/json');
   res.statusCode = 200;
   res.end(JSON.stringify({
     ok: false,
     configured: true,
     providerError: true,
-    error: 'Voice service unavailable. Using browser fallback voice.',
+    error: 'Voice clone synthesis temporarily unavailable (fallback to device speech synthesis).',
+    message: 'Voice clone synthesis temporarily unavailable. Falling back to device speech synthesis.',
     text
   }));
 }

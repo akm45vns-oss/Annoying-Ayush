@@ -135,7 +135,11 @@ export default function ChatPanel({
   // Probe API readiness on mount so status badge transitions from 'checking' to actual live/offline status
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/chat', { method: 'GET', signal: AbortSignal.timeout(4000) })
+    fetch('/api/chat', { 
+      method: 'GET', 
+      headers: { 'x-app-client': 'annoying-ayush' },
+      signal: AbortSignal.timeout(4000) 
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!isMounted) return;
@@ -211,7 +215,10 @@ export default function ChatPanel({
       // Call server-side endpoint (/api/chat)
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-app-client': 'annoying-ayush'
+        },
         body: JSON.stringify({
           message: text,
           history: historyPayload,
@@ -306,7 +313,10 @@ export default function ChatPanel({
 
     fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-app-client': 'annoying-ayush'
+      },
       body: JSON.stringify({ message: text, history: historyPayload, gfName, ayushName }),
       signal: AbortSignal.timeout(13000)
     })

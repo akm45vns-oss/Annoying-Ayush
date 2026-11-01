@@ -48,7 +48,11 @@ export default function VoicePanel({
 
     // Probe server-side TTS readiness probe
     let isMounted = true;
-    fetch('/api/tts', { method: 'GET', signal: AbortSignal.timeout(4000) })
+    fetch('/api/tts', { 
+      method: 'GET', 
+      headers: { 'x-app-client': 'annoying-ayush' },
+      signal: AbortSignal.timeout(4000) 
+    })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!isMounted) return;

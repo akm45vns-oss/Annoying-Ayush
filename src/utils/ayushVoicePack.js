@@ -11,7 +11,10 @@
  * 4. Graceful fallback when no voice recording is present.
  */
 
+import { safeSetEncryptedItem, safeGetEncryptedItem } from './secureStorage.js';
+
 const STORAGE_PREFIX = 'annoying_ayush_real_voice_';
+const MAX_RECORDING_BYTES = 350 * 1024; // 350 KB bounded limit per recording to prevent storage exhaustion
 
 export const VOICE_ACTIONS = [
   { id: 'kiss', label: 'Kiss Reaction', emoji: '💋', hint: 'Say: Mwah! One kiss is never enough, Jaanu!' },
@@ -52,7 +55,7 @@ class AyushVoicePackManager {
   hasCustomVoice(actionId) {
     if (typeof window === 'undefined') return false;
     try {
-      const stored = localStorage.getItem(`${STORAGE_PREFIX}${actionId}`);
+      const stored = safeGetEncryptedItem(`${STORAGE_PREFIX}${actionId}`, false);
       return !!(stored && stored.startsWith('data:audio'));
     } catch {
       return false;
@@ -60,29 +63,40 @@ class AyushVoicePackManager {
   }
 
   /**
-   * Get custom recording Data URL if stored
+   * Get custom recording Data URL if stored (automatically decrypted)
    */
   getCustomVoiceDataUrl(actionId) {
     if (typeof window === 'undefined') return null;
     try {
-      return localStorage.getItem(`${STORAGE_PREFIX}${actionId}`) || null;
+      const data = safeGetEncryptedItem(`${STORAGE_PREFIX}${actionId}`, false);
+      return data || null;
     } catch {
       return null;
     }
   }
 
   /**
-   * Save a recorded audio blob for an action
+   * Save a recorded audio blob for an action with quota protection and encryption
    * @param {string} actionId 
    * @param {Blob} blob 
    */
   async saveActionVoiceBlob(actionId, blob) {
+    if (blob && blob.size && blob.size > MAX_RECORDING_BYTES) {
+      return Promise.reject(new Error(`Recording exceeds maximum allowed size (350 KB). Please keep it short.`));
+    }
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         try {
           const base64data = reader.result;
-          localStorage.setItem(`${STORAGE_PREFIX}${actionId}`, base64data);
+          if (typeof base64data !== 'string' || !base64data.startsWith('data:audio')) {
+            throw new Error('Invalid audio data format.');
+          }
+          const saved = safeSetEncryptedItem(`${STORAGE_PREFIX}${actionId}`, base64data, MAX_RECORDING_BYTES * 2);
+          if (!saved) {
+            throw new Error('Storage write failed or exceeded quota.');
+          }
           resolve(base64data);
         } catch (err) {
           reject(err);

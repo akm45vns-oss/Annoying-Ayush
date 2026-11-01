@@ -37,9 +37,9 @@ class ClonedVoiceEngine {
       try {
         const ctx = this.getAudioContext();
         if (ctx && ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
+          ctx.resume().catch(() => { });
         }
-      } catch {}
+      } catch { }
       if ('speechSynthesis' in window) {
         try {
           if (window.speechSynthesis.paused) {
@@ -48,7 +48,7 @@ class ClonedVoiceEngine {
           const dummy = new SpeechSynthesisUtterance(' ');
           dummy.volume = 0.01;
           window.speechSynthesis.speak(dummy);
-        } catch {}
+        } catch { }
       }
     }
   }
@@ -61,7 +61,7 @@ class ClonedVoiceEngine {
       }
     }
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume().catch(() => {});
+      this.audioCtx.resume().catch(() => { });
     }
     return this.audioCtx;
   }
@@ -74,7 +74,7 @@ class ClonedVoiceEngine {
     if (this.currentAbortController) {
       try {
         this.currentAbortController.abort();
-      } catch {}
+      } catch { }
       this.currentAbortController = null;
     }
     this.isGenerating = false;
@@ -106,7 +106,7 @@ class ClonedVoiceEngine {
     const timeoutId = setTimeout(() => {
       try {
         controller.abort(new Error('TTS request timed out on client (17s).'));
-      } catch {}
+      } catch { }
     }, 17000);
 
     const cleanText = text.trim();
@@ -114,7 +114,10 @@ class ClonedVoiceEngine {
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-app-client': 'annoying-ayush'
+        },
         body: JSON.stringify({ text: cleanText }),
         signal: controller.signal
       });
@@ -217,7 +220,7 @@ class ClonedVoiceEngine {
    * @param {Function} onAmplitude - (normalized 0.0 to 1.0)
    * @param {Function} onEnded - callback when done
    */
-  playSpeech(mode = 'ayush', onAmplitude = () => {}, onEnded = () => {}) {
+  playSpeech(mode = 'ayush', onAmplitude = () => { }, onEnded = () => { }) {
     this.stopPlayback();
 
     // If an audio buffer exists (from ElevenLabs or TTS API)
@@ -339,7 +342,7 @@ class ClonedVoiceEngine {
             const inVoice = voices.find((v) => v.lang && (v.lang === 'en-IN' || v.lang.toLowerCase().includes('en-in')));
             if (inVoice) utterance.voice = inVoice;
           }
-        } catch {}
+        } catch { }
       }
 
       utterance.volume = 1.0;
@@ -485,7 +488,7 @@ class ClonedVoiceEngine {
   /**
    * Directly speak text via browser SpeechSynthesis with realistic mouth animation
    */
-  speakDirectText(text, mode = 'funny', onAmplitude = () => {}, onEnded = () => {}) {
+  speakDirectText(text, mode = 'funny', onAmplitude = () => { }, onEnded = () => { }) {
     this.stopPlayback();
     this.lastGeneratedText = text;
     this.cachedAudioBuffer = null;
@@ -502,7 +505,7 @@ class ClonedVoiceEngine {
           if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
-        } catch {}
+        } catch { }
       }
 
       const utterance = new SpeechSynthesisUtterance(text);
@@ -598,10 +601,10 @@ class ClonedVoiceEngine {
    * - 'cloned': Authorized server-side cloned voice (with graceful fallback to device)
    */
   async speakPhraseWithMode(text, mode = 'funny', {
-    onStart = () => {},
-    onAmplitude = () => {},
-    onEnded = () => {},
-    onFallback = () => {}
+    onStart = () => { },
+    onAmplitude = () => { },
+    onEnded = () => { },
+    onFallback = () => { }
   } = {}) {
     const cleanText = (text || '').trim();
     if (!cleanText) {
@@ -659,7 +662,7 @@ class ClonedVoiceEngine {
       try {
         this.currentSource.stop();
         this.currentSource.disconnect();
-      } catch {}
+      } catch { }
       this.currentSource = null;
     }
 
@@ -668,7 +671,7 @@ class ClonedVoiceEngine {
         if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
           window.speechSynthesis.cancel();
         }
-      } catch {}
+      } catch { }
     }
 
     if (this.animFrameId) {
