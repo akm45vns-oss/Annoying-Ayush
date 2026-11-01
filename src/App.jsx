@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Mic } from 'lucide-react';
+import { Mic, Pause, Play, Square, RefreshCw } from 'lucide-react';
 import Header from './components/Header';
 import AyushScene from './components/AyushScene';
 import SpeechBubble from './components/SpeechBubble';
@@ -107,22 +107,41 @@ export default function App() {
   // Authoritative active status: True whenever continuous voice engine is running
   const isListening = listeningState === LISTENING_STATES.LISTENING ||
                       listeningState === LISTENING_STATES.STARTING ||
+                      listeningState === LISTENING_STATES.CALIBRATING ||
+                      listeningState === LISTENING_STATES.CAPTURING ||
+                      listeningState === LISTENING_STATES.TRANSCRIBING ||
                       listeningState === LISTENING_STATES.PROCESSING ||
                       listeningState === LISTENING_STATES.SPEAKING;
 
-  // Sync listeningState with talkingTomController state events
+  const isPaused = listeningState === LISTENING_STATES.PAUSED;
+  const isVoiceActive = isListening || isPaused || listeningState === LISTENING_STATES.RECOVERING;
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  // Sync listeningState and audioLevel with talkingTomController state events
   useEffect(() => {
     const handleState = (state, detail = {}) => {
       setListeningState(state);
       if (state === LISTENING_STATES.ERROR && detail.message) {
         setMicErrorMessage(detail.message);
-      } else if (state === LISTENING_STATES.LISTENING || state === LISTENING_STATES.PROCESSING || state === LISTENING_STATES.SPEAKING) {
+      } else if (state === LISTENING_STATES.LISTENING || 
+                 state === LISTENING_STATES.CAPTURING || 
+                 state === LISTENING_STATES.CALIBRATING || 
+                 state === LISTENING_STATES.PROCESSING || 
+                 state === LISTENING_STATES.SPEAKING) {
         setMicErrorMessage('');
       }
     };
     talkingTomController.addStateListener(handleState);
+
+    talkingTomController.onAudioLevel = (_rms, normalized) => {
+      setAudioLevel(normalized);
+    };
+
     return () => {
       talkingTomController.removeStateListener(handleState);
+      if (talkingTomController.onAudioLevel) {
+        talkingTomController.onAudioLevel = null;
+      }
     };
   }, []);
 
@@ -349,17 +368,39 @@ export default function App() {
     talkingTomController.startListening();
   }, []);
 
+  const handlePauseListening = useCallback(() => {
+    soundManager.playPop();
+    talkingTomController.pauseListening();
+  }, []);
+
+  const handleResumeListening = useCallback(() => {
+    soundManager.playPop();
+    clonedVoiceEngine.unlockAudio();
+    talkingTomController.resumeListening();
+  }, []);
+
+  const handleStopListening = useCallback(() => {
+    soundManager.playPop();
+    talkingTomController.stopListening();
+    interruptVoiceIfPlaying();
+  }, [interruptVoiceIfPlaying]);
+
   const handleToggleListening = useCallback(() => {
     soundManager.playPop();
     setMicErrorMessage('');
     if (talkingTomController.isExplicitlyEnabled) {
-      talkingTomController.stopListening();
+      if (listeningState === LISTENING_STATES.PAUSED) {
+        clonedVoiceEngine.unlockAudio();
+        talkingTomController.resumeListening();
+      } else {
+        talkingTomController.pauseListening();
+      }
     } else {
       clonedVoiceEngine.unlockAudio();
       voiceEngine.getAudioContext();
       talkingTomController.startListening();
     }
-  }, []);
+  }, [listeningState]);
 
   // Reset character and state cleanly
   const resetToIdle = useCallback(() => {
@@ -824,7 +865,7 @@ export default function App() {
           {/* Hands-free listening status & toggle */}
           {activeTab !== 'chat' && (
             <div className="tom-start-prompt-wrap">
-              {!isListening ? (
+              {!isVoiceActive ? (
                 <button
                   type="button"
                   className="tom-start-prompt-btn"
@@ -835,18 +876,90 @@ export default function App() {
                   <span>Tap to Talk to Ayush 🎙️</span>
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="tom-start-prompt-btn listening-active"
-                  onClick={handleToggleListening}
-                  aria-label="Ayush is listening. Tap to pause."
-                >
-                  <span className="listening-pulse-dot" />
-                  <span>Ayush is Listening... (Tap to Pause)</span>
-                </button>
+                <div className={`tom-voice-status-pill ${listeningState}`}>
+                  {/* Left: Indicator / Audio meter */}
+                  {listeningState === LISTENING_STATES.CAPTURING ? (
+                    <div className="status-indicator-group">
+                      <span className="listening-pulse-dot capturing" />
+                      <span className="status-label">Hearing you... 🎙️</span>
+                    </div>
+                  ) : (listeningState === LISTENING_STATES.TRANSCRIBING || listeningState === LISTENING_STATES.PROCESSING) ? (
+                    <div className="status-indicator-group">
+                      <span className="status-thinking-shimmer" />
+                      <span className="status-label">Thinking... ✨</span>
+                    </div>
+                  ) : listeningState === LISTENING_STATES.SPEAKING ? (
+                    <div className="status-indicator-group">
+                      <span className="listening-pulse-dot speaking" />
+                      <span className="status-label">Ayush is speaking...</span>
+                    </div>
+                  ) : isPaused ? (
+                    <div className="status-indicator-group">
+                      <span className="status-paused-dot" />
+                      <span className="status-label">Mic Paused</span>
+                    </div>
+                  ) : listeningState === LISTENING_STATES.RECOVERING ? (
+                    <div className="status-indicator-group">
+                      <RefreshCw size={13} className="spin-recovering" />
+                      <span className="status-label">Reconnecting...</span>
+                    </div>
+                  ) : (
+                    <div className="status-indicator-group">
+                      <span className="listening-pulse-dot" />
+                      <span className="status-label">Listening...</span>
+                      {/* Subtle audio level meter */}
+                      <div className="audio-level-meter" aria-hidden="true">
+                        <span className="meter-bar" style={{ transform: `scaleY(${Math.max(0.2, audioLevel * 1.0)})` }} />
+                        <span className="meter-bar" style={{ transform: `scaleY(${Math.max(0.3, audioLevel * 1.6)})` }} />
+                        <span className="meter-bar" style={{ transform: `scaleY(${Math.max(0.2, audioLevel * 0.9)})` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Right: Controls */}
+                  <div className="status-controls-group">
+                    {isPaused ? (
+                      <button
+                        type="button"
+                        className="status-control-btn resume"
+                        onClick={handleResumeListening}
+                        title="Resume listening"
+                        aria-label="Resume listening"
+                      >
+                        <Play size={12} />
+                        <span>Resume</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="status-control-btn pause"
+                        onClick={handlePauseListening}
+                        title="Pause listening"
+                        aria-label="Pause listening"
+                      >
+                        <Pause size={12} />
+                        <span>Pause</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="status-control-btn stop"
+                      onClick={handleStopListening}
+                      title="Stop microphone"
+                      aria-label="Stop microphone"
+                    >
+                      <Square size={11} />
+                      <span>Stop</span>
+                    </button>
+                  </div>
+                </div>
               )}
               {micErrorMessage && (
-                <p className="tom-mic-error-pill">{micErrorMessage}</p>
+                <div className="tom-mic-error-pill">
+                  <span>{micErrorMessage}</span>
+                  <button type="button" className="error-retry-btn" onClick={handleStartListening}>Retry</button>
+                </div>
               )}
             </div>
           )}

@@ -11,14 +11,25 @@
  * - Clean resource disposal
  */
 
+import { MicrophoneSession } from '../features/voice/controllers/MicrophoneSession.js';
+import { SpeechSegmenter } from '../features/voice/controllers/SpeechSegmenter.js';
+import { TranscriptionService } from '../features/voice/controllers/TranscriptionService.js';
+import { normalizeTranscript, isValidSpeechTranscript } from '../features/voice/utils/normalizeTranscript.js';
+
 export const LISTENING_STATES = {
+  OFF: 'off',
   IDLE: 'idle',
+  REQUESTING: 'requesting',
   REQUESTING_PERMISSION: 'requesting_permission',
   STARTING: 'starting',
+  CALIBRATING: 'calibrating',
   LISTENING: 'listening',
+  CAPTURING: 'capturing',
+  TRANSCRIBING: 'transcribing',
   PROCESSING: 'processing',
   SPEAKING: 'speaking',
   PAUSED: 'paused',
+  RECOVERING: 'recovering',
   ERROR: 'error'
 };
 
@@ -93,16 +104,55 @@ export class TalkingTomController {
     // Bounded restart rate tracker
     this.recentRestartTimes = [];
 
+    // Dedicated Persistent Microphone and VAD services (Spec §2 & §3)
+    this.micSession = new MicrophoneSession();
+    this.speechSegmenter = new SpeechSegmenter();
+    this.transcriptionService = new TranscriptionService();
+
     // Callbacks & Event Listeners
     this.onStateChange = null;
     this.onPhraseFinalized = null;
     this.onAudioRecorded = null;
     this.onError = null;
     this.onInterimResult = null;
+    this.onAudioLevel = null;
     this.stateListeners = new Set();
+
+    // Setup persistent VAD event bindings
+    this.setupPersistentVadListeners();
 
     // Bind event handlers
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+  }
+
+  setupPersistentVadListeners() {
+    this.micSession.onDisconnected = (_reason) => {
+      if (this.isExplicitlyEnabled) {
+        this.setState(LISTENING_STATES.RECOVERING, { message: 'Microphone disconnected. Tap to reconnect.' });
+      }
+    };
+
+    this.speechSegmenter.onSpeechStart = () => {
+      if (this.state === LISTENING_STATES.LISTENING) {
+        this.setState(LISTENING_STATES.CAPTURING, { message: 'Hearing your voice...' });
+      }
+    };
+
+    this.speechSegmenter.onAudioLevel = (rms, normalized) => {
+      if (typeof this.onAudioLevel === 'function') {
+        this.onAudioLevel(rms, normalized);
+      }
+    };
+
+    this.speechSegmenter.onCalibrationComplete = () => {
+      if (this.state === LISTENING_STATES.CALIBRATING && this.isExplicitlyEnabled) {
+        this.setState(LISTENING_STATES.LISTENING, { message: 'Ayush is listening!' });
+      }
+    };
+
+    this.speechSegmenter.onPhraseCaptured = (blob, durationMs) => {
+      this.handleAudioPhraseCaptured(blob, durationMs);
+    };
   }
 
   hasOptedIn() {
@@ -371,7 +421,11 @@ export class TalkingTomController {
       if (currentGen !== this.sessionGeneration) return;
       if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING) return;
 
-      if (this.hasSpeechRecognition()) {
+      if (this.speechSegmenter && this.speechSegmenter.stream && this.speechSegmenter.stream.active) {
+        this.speechSegmenter.reset();
+        this.speechSegmenter.resume();
+        this.setState(LISTENING_STATES.LISTENING, { message: 'Ayush is listening!' });
+      } else if (this.hasSpeechRecognition()) {
         if (this.isRecognitionActive) {
           this.setState(LISTENING_STATES.LISTENING);
         } else {
@@ -387,42 +441,27 @@ export class TalkingTomController {
    * Stop active audio VAD and release microphone tracks
    */
   stopAudioVad() {
-    if (this.vadInterval) {
-      clearInterval(this.vadInterval);
-      this.vadInterval = null;
+    if (this.speechSegmenter) {
+      this.speechSegmenter.stop();
     }
-    if (this.vadMediaRecorder && this.vadMediaRecorder.state !== 'inactive') {
-      try {
-        this.vadMediaRecorder.stop();
-      } catch {}
+    if (this.transcriptionService) {
+      this.transcriptionService.cancel();
     }
-    this.vadMediaRecorder = null;
-    if (this.vadStream) {
-      try {
-        this.vadStream.getTracks().forEach((t) => t.stop());
-      } catch {}
-      this.vadStream = null;
+    if (this.micSession) {
+      this.micSession.stop().catch(() => {});
     }
-    if (this.vadAudioCtx) {
-      try {
-        this.vadAudioCtx.close();
-      } catch {}
-      this.vadAudioCtx = null;
-    }
-    this.isVadRecording = false;
-    this.vadChunks = [];
   }
 
   /**
-   * Fallback for native Android WebView / Mobile browsers lacking SpeechRecognition:
-   * Uses Web Audio VAD & MediaRecorder for true Talking Tom recording & pitch-shift repetition!
+   * Persistent Microphone & VAD Continuous Listening Engine (Spec §2, §3, §4):
+   * Acquires the microphone ONCE, continuously segments speech phrases with adaptive noise calibration,
+   * transcribes completed phrases, repeats via character TTS/audio with lip-sync,
+   * gates VAD during playback, and resumes on the SAME microphone stream!
    */
   async startAudioVadListening(generation = this.sessionGeneration) {
     if (generation !== this.sessionGeneration) return;
     if (!this.isExplicitlyEnabled) return;
     if (this.state === LISTENING_STATES.SPEAKING) return;
-
-    this.stopAudioVad();
 
     if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       this.setState(LISTENING_STATES.ERROR, {
@@ -434,39 +473,19 @@ export class TalkingTomController {
 
     try {
       this.setState(LISTENING_STATES.STARTING, { message: 'Accessing microphone...' });
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+      const stream = await this.micSession.start();
+
       if (generation !== this.sessionGeneration || !this.isExplicitlyEnabled) {
-        stream.getTracks().forEach((t) => t.stop());
+        await this.micSession.stop();
         return;
       }
 
-      this.vadStream = stream;
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) {
-        try {
-          this.vadAudioCtx = new AudioCtx();
-          if (this.vadAudioCtx.state === 'suspended') {
-            await this.vadAudioCtx.resume().catch(() => {});
-          }
-          const source = this.vadAudioCtx.createMediaStreamSource(stream);
-          this.vadAnalyser = this.vadAudioCtx.createAnalyser();
-          this.vadAnalyser.fftSize = 256;
-          source.connect(this.vadAnalyser);
-        } catch {}
-      }
-
-      this.initVadMediaRecorder(stream);
-      this.startVadMonitor(generation);
-      this.setState(LISTENING_STATES.LISTENING, { message: 'Ayush is listening!' });
+      this.speechSegmenter.attachStream(stream, this.micSession.analyser);
+      this.setState(LISTENING_STATES.CALIBRATING, { message: 'Calibrating microphone...' });
+      this.speechSegmenter.start();
     } catch (err) {
       if (generation !== this.sessionGeneration) return;
-      console.warn('Audio VAD error:', err);
+      console.warn('[TalkingTomController] Audio VAD start error:', err);
       const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
       this.setState(LISTENING_STATES.ERROR, {
         error: isDenied ? 'not-allowed' : 'audio-capture',
@@ -474,106 +493,59 @@ export class TalkingTomController {
           ? 'Microphone access denied. Please grant microphone permission so Ayush can hear you!'
           : 'Could not access microphone.'
       });
-    }
-  }
-
-  initVadMediaRecorder(stream) {
-    this.vadChunks = [];
-    let selectedMime = '';
-    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
-      const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'];
-      for (const t of candidates) {
-        if (MediaRecorder.isTypeSupported(t)) {
-          selectedMime = t;
-          break;
-        }
+      if (typeof this.onError === 'function') {
+        this.onError(isDenied ? 'not-allowed' : 'audio-capture');
       }
     }
-    const options = selectedMime ? { mimeType: selectedMime } : {};
-    try {
-      this.vadMediaRecorder = new MediaRecorder(stream, options);
-      this.vadMediaRecorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          this.vadChunks.push(e.data);
-        }
-      };
-      this.vadMediaRecorder.onstop = async () => {
-        if (this.vadChunks.length > 0) {
-          const blob = new Blob(this.vadChunks, { type: selectedMime || 'audio/webm' });
-          this.vadChunks = [];
-          if (blob.size > 1500) {
-            this.handleAudioPhraseCaptured(blob);
-          } else if (this.isExplicitlyEnabled && this.state !== LISTENING_STATES.SPEAKING) {
-            this.setState(LISTENING_STATES.LISTENING);
-          }
-        }
-      };
-    } catch (e) {
-      console.warn('MediaRecorder init error in VAD:', e);
-    }
   }
 
-  startVadMonitor(generation) {
-    if (this.vadInterval) clearInterval(this.vadInterval);
-    if (!this.vadAnalyser) return;
+  async handleAudioPhraseCaptured(blob, _durationMs) {
+    if (!this.isExplicitlyEnabled || this.state === LISTENING_STATES.SPEAKING || this.state === LISTENING_STATES.PAUSED) {
+      return;
+    }
 
-    const dataArray = new Uint8Array(this.vadAnalyser.frequencyBinCount);
-    let consecutiveSpeechFrames = 0;
-    let consecutiveSilenceFrames = 0;
+    const currentGen = this.sessionGeneration;
+    this.setState(LISTENING_STATES.PROCESSING, { message: 'Hearing your phrase...' });
 
-    this.vadInterval = setInterval(() => {
-      if (generation !== this.sessionGeneration || !this.isExplicitlyEnabled) {
-        clearInterval(this.vadInterval);
+    // Gate VAD during transcription and character playback (Spec §7)
+    this.speechSegmenter.pause();
+
+    try {
+      // 1. Attempt speech-to-text via TranscriptionService (/api/stt)
+      const sttResult = await this.transcriptionService.transcribe(blob, {
+        language: this.options.recognitionLanguage
+      });
+
+      if (currentGen !== this.sessionGeneration || !this.isExplicitlyEnabled) {
         return;
       }
-      if (this.state === LISTENING_STATES.SPEAKING) return;
 
-      this.vadAnalyser.getByteFrequencyData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-      const volume = sum / dataArray.length / 255;
-
-      if (volume > 0.07) {
-        consecutiveSpeechFrames++;
-        consecutiveSilenceFrames = 0;
-
-        if (consecutiveSpeechFrames >= 2 && !this.isVadRecording) {
-          this.isVadRecording = true;
-          this.vadChunks = [];
-          if (this.vadMediaRecorder && this.vadMediaRecorder.state === 'inactive') {
-            try { this.vadMediaRecorder.start(100); } catch {}
-          }
-          this.setState(LISTENING_STATES.PROCESSING, { message: 'Hearing your voice...' });
-        }
-      } else {
-        consecutiveSpeechFrames = 0;
-        if (this.isVadRecording) {
-          consecutiveSilenceFrames++;
-          if (consecutiveSilenceFrames >= 16) {
-            this.isVadRecording = false;
-            if (this.vadMediaRecorder && this.vadMediaRecorder.state === 'recording') {
-              try { this.vadMediaRecorder.stop(); } catch {}
-            }
-          }
+      if (sttResult.ok && sttResult.text) {
+        const cleanText = normalizeTranscript(sttResult.text);
+        if (isValidSpeechTranscript(cleanText)) {
+          this.processFinalPhrase(cleanText);
+          return;
         }
       }
-    }, 50);
-  }
 
-  async handleAudioPhraseCaptured(blob) {
-    this.setState(LISTENING_STATES.PROCESSING, { message: 'Repeating your voice!' });
-    try {
+      // 2. Fallback: If STT is unconfigured or unavailable, repeat the audio directly with pitch-shift!
       const arrayBuffer = await blob.arrayBuffer();
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioCtx();
-      const decoded = await ctx.decodeAudioData(arrayBuffer);
-      if (typeof this.onAudioRecorded === 'function') {
-        this.onAudioRecorded(decoded, blob);
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const decoded = await ctx.decodeAudioData(arrayBuffer);
+        ctx.close().catch(() => {});
+
+        if (currentGen !== this.sessionGeneration || !this.isExplicitlyEnabled) return;
+
+        if (typeof this.onAudioRecorded === 'function') {
+          this.onAudioRecorded(decoded, blob);
+        }
       }
     } catch (err) {
-      console.warn('Audio decode error in VAD:', err);
+      console.warn('[TalkingTomController] handleAudioPhraseCaptured error:', err);
       if (this.isExplicitlyEnabled) {
-        this.scheduleRestart(400, 'decode_error');
+        this.scheduleRestart(300, 'phrase_capture_error');
       }
     }
   }
@@ -589,6 +561,9 @@ export class TalkingTomController {
     if (isSpeaking) {
       // Transition to SPEAKING state (handleResult immediately ignores any input)
       logVoiceDiagnostic('speaking_started', { generation: this.sessionGeneration });
+      if (this.speechSegmenter) {
+        this.speechSegmenter.pause();
+      }
       this.setState(LISTENING_STATES.SPEAKING);
       this.currentInterimText = '';
     } else {

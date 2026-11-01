@@ -553,6 +553,180 @@ html, body {
   animation: listeningPulse 2s infinite ease-in-out;
 }
 
+/* Continuous Voice Status Pill */
+.tom-voice-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px 6px 16px;
+  min-height: 44px;
+  box-shadow: 0 6px 20px rgba(233, 121, 162, 0.28);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--color-text-main);
+  animation: tomPromptFadeUp 220ms var(--ease-standard);
+}
+
+.status-indicator-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-label {
+  font-weight: 600;
+  color: #9d174d;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Audio Level Meter */
+.audio-level-meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2.5px;
+  height: 14px;
+  padding: 0 2px;
+}
+
+.meter-bar {
+  width: 3px;
+  height: 100%;
+  background: #ec4899;
+  border-radius: 2px;
+  transform-origin: bottom;
+  transition: transform 60ms linear;
+}
+
+.listening-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ec4899;
+  flex-shrink: 0;
+  animation: dotBlink 1s infinite alternate;
+}
+
+.listening-pulse-dot.capturing {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  animation: dotBlinkFast 0.5s infinite alternate;
+}
+
+.listening-pulse-dot.speaking {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  animation: dotBlink 0.8s infinite alternate;
+}
+
+.status-paused-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9ca3af;
+  flex-shrink: 0;
+}
+
+.status-thinking-shimmer {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+  animation: dotBlinkFast 0.6s infinite alternate;
+}
+
+.spin-recovering {
+  animation: spin 1s linear infinite;
+  color: #f59e0b;
+}
+
+@keyframes dotBlinkFast {
+  from { opacity: 0.5; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1.25); }
+}
+
+/* Status Controls Group */
+.status-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 1px solid rgba(233, 121, 162, 0.3);
+  padding-left: 10px;
+}
+
+.status-control-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: #fdf2f8;
+  color: #9d174d;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all 120ms ease;
+  min-height: 28px;
+}
+
+.status-control-btn:hover {
+  background: #fce7f3;
+  transform: translateY(-1px);
+}
+
+.status-control-btn.stop {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-control-btn.stop:hover {
+  background: #fecaca;
+}
+
+.status-control-btn.resume {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.status-control-btn.resume:hover {
+  background: #d1fae5;
+}
+
+.tom-mic-error-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFEBEE;
+  border: 1px solid #FFCDD2;
+  color: #C62828;
+  font-size: var(--text-xs);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.35;
+}
+
+.error-retry-btn {
+  border: none;
+  background: #C62828;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
 @keyframes listeningPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
   50% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }

@@ -1,10 +1,10 @@
 # IMPLEMENTATION_STATUS.md — Annoying Ayush Feature Audit & Status
 
 > **Verified against actual source code**  
-> **Date**: October 2026  
-> **Test Suite**: 114 / 114 Tests Passing (`node:test`)  
+> **Date**: November 2026  
+> **Test Suite**: 129 / 129 Tests Passing (`node:test`)  
 > **Linter**: 0 Errors, 0 Warnings (`oxlint`)  
-> **Production Build**: Built cleanly with modular code splitting (`dist/assets/index-*.js`, gzip: 113 KB)  
+> **Production Build**: Built cleanly with modular code splitting (`dist/assets/index-*.js`, gzip: 122 KB)  
 > **Git**: Branch `main`, all changes verified locally (never pushed without authorization)  
 > **Core Principle**: 100% Free Virtual Companion — zero currency, zero micro-transactions, zero locks, all items & features immediately accessible.
 
@@ -86,22 +86,24 @@
 
 ---
 
-## 3. Voice and Talking Tom Repeat System (Spec §5)
+## 3. Continuous Talking Tom Speech Engine (Spec §5 & Technical Specification)
 
 | Feature | Status | Implementation Details |
 |:--------|:------:|:-----------------------|
-| Push-to-Talk / Tap to Talk | ✅ Working | Prominent "Tap to Talk to Ayush 🎙️" start prompt when listening is inactive |
-| Opt-in Continuous Listening | ✅ Working | `talkingTomController.js` manages hands-free SpeechRecognition session with user consent |
-| Clear Voice States | ✅ Working | `LISTENING_STATES`: IDLE, STARTING, LISTENING, PROCESSING, SPEAKING, PAUSED, ERROR, UNSUPPORTED |
-| Microphone Permission Flow | ✅ Working | `checkMicrophonePermission()` checks status, displays clear instructions on denial |
-| Feedback Loop Prevention | ✅ Working | Speech recognition strictly suspended while Ayush speaks; deduplication window; 450ms cooldown |
-| Character Voice Repeat | ✅ Working | `clonedVoiceEngine.speakPhraseWithMode(phrase, 'device')` |
+| Persistent Microphone Session | ✅ Working | `MicrophoneSession.js`: acquires one `getUserMedia()` stream per active session, reuses across all phrases, stops tracks only on explicit stop |
+| Real Voice Activity Detection | ✅ Working | `SpeechSegmenter.js`: ambient noise calibration, adaptive noise floor, hysteresis (`startThreshold > continueThreshold`), 140ms start confirmation, 750ms natural silence, 250ms–10s bounds |
+| Phrase Audio Capture | ✅ Working | Records phrase audio via `MediaRecorder` on persistent stream without stopping underlying microphone tracks |
+| Speech-to-Text Integration | ✅ Working | `TranscriptionService.js` and `/api/stt` server endpoint with Groq Whisper & OpenAI Whisper, supporting Hindi, Hinglish, Bhojpuri, and Indian English |
+| Loop & Self-Echo Protection | ✅ Working | Absolute playback gating: VAD paused during Ayush's speech, audio reflections dissipated via 250ms settling cooldown, 2000ms deduplication window |
+| Authoritative Voice State Machine | ✅ Working | Single state machine with 10 explicit states: `off`, `requesting`, `calibrating`, `listening`, `capturing`, `transcribing`, `speaking`, `paused`, `recovering`, `error` |
+| Character Voice Repeat | ✅ Working | `PlaybackManager.js`: single coordinator driving character TTS/audio output and 3D mouth lip-sync amplitude without overlapping |
 | Free Indian Male Voice Engine | ✅ Working | Prioritizes `Madhur`, `Prabhat`, `Ravi`, `hi-IN`, `en-IN` local browser voices |
-| Chipmunk Funny Voice Mode | ✅ Working | Pitch 1.45, rate 1.2 via Web Speech synthesis |
+| Chipmunk Funny Voice Mode | ✅ Working | Pitch 1.45, rate 1.2 via Web Speech synthesis or pitch-shifted AudioBuffer |
 | Real Custom Voice Pack | ✅ Working | In-browser MediaRecorder saves custom audio clips to localStorage per action |
 | ElevenLabs Voice Clone Check | ✅ Working | `/api/tts` probes server credentials honestly; falls back gracefully when unconfigured |
 | OpenAI TTS Failover | ✅ Working | Tier 2 server-side failover to OpenAI `tts-1` |
-| Mouth Lip-Sync Animation | ✅ Working | AudioContext analyser node drives morph targets and jaw bone deformation in real-time |
+| Mouth Lip-Sync Animation | ✅ Working | Real-time audio amplitude extraction (0.0 to 1.0) drives mouth blend shapes and jaw bone movement |
+| Compact Mobile Voice UI | ✅ Working | Minimal status pill with real-time 3-bar audio level meter, pause/resume, and immediate stop button |
 | In-App Volume Controls | ✅ Working | Master volume, character voice volume, and SFX volume sliders in Settings |
 | Optional Captions Setting | ✅ Working | `captionsEnabled` setting displays `voice-caption-toast` during speech repeat |
 | Language Support Settings | ✅ Working | English (`en-IN`), Hindi (`hi-IN`), Hinglish (`hi-IN`), Bhojpuri (`bho-IN`) |
