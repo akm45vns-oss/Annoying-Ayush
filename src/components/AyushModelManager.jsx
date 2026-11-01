@@ -75,7 +75,8 @@ export default function AyushModelManager({
   onTapPart = () => {},
   isHovered = false,
   setIsHovered = () => {},
-  talkingVolume = 0
+  talkingVolume = 0,
+  equippedWardrobe = {}
 }) {
   const activeUrl = customModelUrl || '/models/ayush.glb';
   const [defaultModelFound, setDefaultModelFound] = useState(null); // null = probing, true = found, false = not found
@@ -112,6 +113,7 @@ export default function AyushModelManager({
       isHovered={isHovered}
       setIsHovered={setIsHovered}
       talkingVolume={talkingVolume}
+      equippedWardrobe={equippedWardrobe}
     />
   );
 
@@ -137,6 +139,7 @@ export default function AyushModelManager({
             onTapPart={onTapPart}
             setIsHovered={setIsHovered}
             talkingVolume={talkingVolume}
+            equippedWardrobe={equippedWardrobe}
           />
         ) : (
           proceduralFallback

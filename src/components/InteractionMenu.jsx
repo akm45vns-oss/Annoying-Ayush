@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Heart, 
   Smile, 
@@ -6,7 +6,9 @@ import {
   Sparkles,
   HeartHandshake,
   Moon,
-  MessageCircle
+  MessageCircle,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 import ChatPanel from './ChatPanel';
@@ -24,6 +26,7 @@ export default function InteractionMenu({
   ayushName = 'Ayush',
   onAyushReply = () => {}
 }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const actions = [
     {
       id: 'kiss',
@@ -76,7 +79,7 @@ export default function InteractionMenu({
   ];
 
   return (
-    <div className={`interaction-menu-container ${activeTab === 'chat' ? 'chat-active' : ''}`}>
+    <div className={`interaction-menu-container ${activeTab === 'chat' ? 'chat-active' : ''} ${isCollapsed ? 'menu-collapsed' : ''}`}>
       {/* 1. Strictly Two Primary Navigation Buttons */}
       <div className="menu-nav-tabs">
         <button
@@ -84,11 +87,22 @@ export default function InteractionMenu({
           className={`nav-tab-btn ${activeTab === 'play' ? 'active' : ''}`}
           onClick={() => {
             soundManager.playPop();
-            setActiveTab('play');
+            if (activeTab === 'play') {
+              setIsCollapsed(!isCollapsed);
+            } else {
+              setActiveTab('play');
+              setIsCollapsed(false);
+            }
           }}
+          title={activeTab === 'play' && !isCollapsed ? "Tap to minimize menu" : "Play & Romance 💖"}
         >
           <Sparkles size={14} />
           <span>Play & Romance 💖</span>
+          {activeTab === 'play' && (
+            <span className="tab-collapse-chevron" aria-hidden="true">
+              {isCollapsed ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </span>
+          )}
         </button>
 
         <button
@@ -97,6 +111,7 @@ export default function InteractionMenu({
           onClick={() => {
             soundManager.playPop();
             setActiveTab('chat');
+            setIsCollapsed(false);
           }}
         >
           <MessageCircle size={14} />
@@ -105,7 +120,7 @@ export default function InteractionMenu({
       </div>
 
       {/* 2. Panel Content: Play & Romance actions or AI Chat */}
-      {activeTab === 'play' && (
+      {activeTab === 'play' && !isCollapsed && (
         <div className="action-buttons-grid action-buttons-6">
           {actions.map((act) => {
             const Icon = act.icon;

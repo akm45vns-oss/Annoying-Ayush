@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Settings, Mic, Download } from 'lucide-react';
+import { X, Settings, Mic } from 'lucide-react';
 import { soundManager } from '../utils/audioEffects';
 
 export default function Header({
@@ -15,7 +15,7 @@ export default function Header({
   isDailyClaimable = false,
   onOpenDailyReward = () => {},
   onOpenProfile = () => {},
-  onOpenInstall = () => {}
+  _onOpenInstall = () => {}
 }) {
   const [showInfo, setShowInfo] = useState(false);
   const heartTapsRef = useRef(0);
@@ -105,21 +105,6 @@ export default function Header({
             <span className="level-num">Lv.{level}</span>
           </div>
 
-          {/* Download & Install App Button */}
-          <button
-            type="button"
-            className="header-install-pill"
-            onClick={() => {
-              soundManager.playSparkle();
-              onOpenInstall();
-            }}
-            title="Download & Install App"
-            aria-label="Download and Install App"
-          >
-            <Download size={14} className="install-pill-icon" />
-            <span className="install-pill-text">Install</span>
-          </button>
-
           {/* Settings */}
           <button
             type="button"
@@ -134,7 +119,7 @@ export default function Header({
             <Settings size={17} />
           </button>
 
-          {/* Mic pill – kept for voice repeat UX (text visually hidden on tiny screens) */}
+          {/* Mic pill – compact, accessible voice repeat status */}
           <button
             type="button"
             className={`header-mic-pill ${isListening ? 'active' : ''}`}

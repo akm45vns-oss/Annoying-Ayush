@@ -14,9 +14,9 @@ export default function RoomEnvironment({ themeId = 'studio', _lightingMode = 'd
 
   return (
     <group name="room-environment" position={[0, 0, -0.6]}>
-      {/* 1. Curved Back Wall Panel */}
-      <mesh receiveShadow position={[0, 0.6, -1.8]}>
-        <planeGeometry args={[7.0, 5.0]} />
+      {/* 1. Curved Back Wall Panel - Extra wide & tall so no gray void is ever visible */}
+      <mesh receiveShadow position={[0, 1.2, -1.8]}>
+        <planeGeometry args={[14.0, 10.0]} />
         <meshStandardMaterial 
           color={theme.wallColor} 
           roughness={0.9} 
@@ -24,9 +24,9 @@ export default function RoomEnvironment({ themeId = 'studio', _lightingMode = 'd
         />
       </mesh>
 
-      {/* 2. Room Floor Plane */}
-      <mesh receiveShadow position={[0, -0.90, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[7.0, 6.0]} />
+      {/* 2. Room Floor Plane - Deep and wide floor */}
+      <mesh receiveShadow position={[0, -0.90, 1.0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[14.0, 12.0]} />
         <meshStandardMaterial 
           color={theme.floorColor} 
           roughness={0.8} 
@@ -35,7 +35,7 @@ export default function RoomEnvironment({ themeId = 'studio', _lightingMode = 'd
 
       {/* 3. Baseboard / Trim molding */}
       <mesh position={[0, -0.86, -1.78]}>
-        <boxGeometry args={[7.0, 0.08, 0.04]} />
+        <boxGeometry args={[14.0, 0.08, 0.04]} />
         <meshStandardMaterial color="#ffffff" roughness={0.5} />
       </mesh>
 

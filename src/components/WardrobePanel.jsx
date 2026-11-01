@@ -19,7 +19,8 @@ export default function WardrobePanel({
   const handleEquip = (categoryKey, itemId) => {
     soundManager.playPop();
     const currentEquipped = equipped[categoryKey];
-    const newEquipped = currentEquipped === itemId ? (categoryKey === 'hats' ? 'hat_none' : `${categoryKey}_none`) : itemId;
+    const defaultNoneId = `${categoryKey}_none`;
+    const newEquipped = currentEquipped === itemId ? defaultNoneId : itemId;
 
     const updated = {
       ...progression,

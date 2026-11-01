@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import AyushModelManager from './AyushModelManager';
 import FloatingHearts from './FloatingHearts';
 import RoomEnvironment from './RoomEnvironment';
-import WardrobeAccessories3D from './WardrobeAccessories3D';
 import { LIGHTING_PRESETS } from '../utils/roomSettings';
 
 // Deterministic particle positions generated once
@@ -204,9 +203,6 @@ export default function AyushScene({
         {floatingEffectsEnabled && <FloatingParticles />}
         {floatingEffectsEnabled && <FloatingHearts burstTrigger={heartBurst} />}
 
-        {/* 3D Wardrobe Accessories (Hats, Glasses, Bowties, Wings) */}
-        <WardrobeAccessories3D equipped={equippedWardrobe} />
-
         {/* Central Character (Custom Rigged GLB or Fallback Procedural Chibi) */}
         <AyushModelManager
           customModelUrl={customModelUrl}
@@ -215,19 +211,16 @@ export default function AyushScene({
           isHovered={isHovered}
           setIsHovered={setIsHovered}
           talkingVolume={talkingVolume}
+          equippedWardrobe={equippedWardrobe}
         />
 
-        {/* Constrained Camera Orbit Controls with face-focused zoom target */}
+        {/* Fixed Front-Facing Talking Tom Stage Camera — Room Rotation Locked */}
         <OrbitControls
           ref={controlsRef}
           target={[0, 0.38, 0]}
+          enableRotate={false}
           enablePan={false}
-          enableZoom={true}
-          minDistance={1.4}
-          maxDistance={4.0}
-          minPolarAngle={Math.PI / 2.8}
-          maxPolarAngle={Math.PI / 1.95}
-          dampingFactor={0.06}
+          enableZoom={false}
         />
       </Canvas>
     </div>

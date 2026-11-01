@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import { SkeletonUtils } from 'three-stdlib';
+import WardrobeAccessories3D from './WardrobeAccessories3D';
 
 /**
  * CustomAyushModel
@@ -16,19 +17,22 @@ import { SkeletonUtils } from 'three-stdlib';
  * - Skeletal Animation Integration: Auto-detects and plays bundled animation clips (e.g. WalkAndTalk).
  * - Head & Face Secondary Motion: Conversational nods, smiling, blushing, and physics bounce.
  * - Multi-Zone Touch Hitboxes: Retains touch reactions for head, cheeks, and body.
+ * - Wardrobe & Costume Customization: Seamless real-time outfit materials and synchronized 3D accessories.
  */
 export default function CustomAyushModel({
   modelUrl = '/models/ayush.glb',
   currentAction = 'idle',
   onTapPart = () => {},
   setIsHovered = () => {},
-  talkingVolume = 0
+  talkingVolume = 0,
+  equippedWardrobe = {}
 }) {
   const groupRef = useRef();
   const modelRef = useRef();
   const bonesRef = useRef({});
   const morphMeshesRef = useRef([]);
   const tapPartRef = useRef('body');
+  const headAnchorRef = useRef();
 
   // Load GLTF / GLB model
   const gltf = useGLTF(modelUrl);
@@ -148,6 +152,76 @@ export default function CustomAyushModel({
     morphMeshesRef.current = morphs;
     bonesRef.current = bones;
   }, [clonedScene]);
+
+  // Apply outfit / costume materials dynamically based on equippedWardrobe.costume
+  useEffect(() => {
+    if (!clonedScene) return;
+
+    const costumeId = equippedWardrobe?.costume || 'costume_none';
+
+    clonedScene.traverse((child) => {
+      if (child.isMesh) {
+        // Handle clothing: avaturn_look_0
+        if (child.name === 'avaturn_look_0' || child.material?.name === 'avaturn_look_0_material') {
+          if (!child.userData.isCostumeCloned) {
+            child.material = child.material.clone();
+            child.userData.isCostumeCloned = true;
+          }
+          const mat = child.material;
+
+          if (costumeId === 'costume_tuxedo') {
+            // Elegant Midnight Navy / Charcoal Tuxedo with satin finish
+            mat.color.set('#1a1a24');
+            mat.roughness = 0.35;
+            mat.metalness = 0.35;
+          } else if (costumeId === 'costume_pajamas') {
+            // Soft Cozy Pastel Blue / Lavender Star Pajamas
+            mat.color.set('#6b8bc2');
+            mat.roughness = 0.90;
+            mat.metalness = 0.05;
+          } else if (costumeId === 'costume_traditional') {
+            // Royal Rich Maroon / Crimson Kurta
+            mat.color.set('#8e1538');
+            mat.roughness = 0.45;
+            mat.metalness = 0.25;
+          } else {
+            // Default pastel hoodie & denims
+            mat.color.set('#ffffff');
+            mat.roughness = 1.0;
+            mat.metalness = 1.0;
+          }
+          mat.needsUpdate = true;
+        }
+
+        // Handle shoes: avaturn_shoes_0
+        if (child.name === 'avaturn_shoes_0' || child.material?.name === 'avaturn_shoes_0_material') {
+          if (!child.userData.isCostumeCloned) {
+            child.material = child.material.clone();
+            child.userData.isCostumeCloned = true;
+          }
+          const mat = child.material;
+          if (costumeId === 'costume_tuxedo') {
+            mat.color.set('#111111');
+            mat.roughness = 0.25;
+            mat.metalness = 0.4;
+          } else if (costumeId === 'costume_pajamas') {
+            mat.color.set('#5c6bc0');
+            mat.roughness = 0.9;
+            mat.metalness = 0.0;
+          } else if (costumeId === 'costume_traditional') {
+            mat.color.set('#c5a059');
+            mat.roughness = 0.4;
+            mat.metalness = 0.3;
+          } else {
+            mat.color.set('#ffffff');
+            mat.roughness = 1.0;
+            mat.metalness = 1.0;
+          }
+          mat.needsUpdate = true;
+        }
+      }
+    });
+  }, [clonedScene, equippedWardrobe?.costume]);
 
   // Setup animations if present
   const { actions, names } = useAnimations(animations, groupRef);
@@ -499,6 +573,13 @@ export default function CustomAyushModel({
       }
     }
 
+    // Sync head accessories anchor to head bone rotation
+    if (bones.head && headAnchorRef.current) {
+      headAnchorRef.current.rotation.x = bones.head.rotation.x;
+      headAnchorRef.current.rotation.y = bones.head.rotation.y;
+      headAnchorRef.current.rotation.z = bones.head.rotation.z;
+    }
+
     // 4. Subtle Base Stage Breathing (when standing idle)
     if (groupRef.current && !isClipRunning) {
       const breathe = Math.sin(t * 2.2) * 0.015;
@@ -514,6 +595,12 @@ export default function CustomAyushModel({
     >
       {/* The Rigged 3D Cloned Model */}
       <primitive ref={modelRef} object={clonedScene} />
+
+      {/* Synchronized 3D Wardrobe Accessories */}
+      <WardrobeAccessories3D 
+        equipped={equippedWardrobe} 
+        headRef={headAnchorRef}
+      />
 
       {/* Invisible Interactive Hitboxes covering Head, Cheeks/Face, Torso, Belly, Hands, and Feet */}
       {/* Head hitbox */}
