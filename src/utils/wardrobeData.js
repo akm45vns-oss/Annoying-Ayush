@@ -19,7 +19,7 @@ export const WARDROBE_ITEMS = {
       name: 'Default Hair',
       category: 'hats',
       price: 0,
-      description: 'Ayush’s signature messy cartoon hair.',
+      description: 'Natural style',
       icon: '💇‍♂️',
       color: '#3e2723'
     },
@@ -28,7 +28,7 @@ export const WARDROBE_ITEMS = {
       name: 'Blossom Clip',
       category: 'hats',
       price: 0,
-      description: 'A delicate pink cherry blossom pinned into his hair.',
+      description: 'Pink petal',
       icon: '🌸',
       color: '#ff80ab'
     },
@@ -37,7 +37,7 @@ export const WARDROBE_ITEMS = {
       name: 'Golden Crown',
       category: 'hats',
       price: 0,
-      description: 'Because he is your pampered little prince!',
+      description: 'Little prince',
       icon: '👑',
       color: '#ffd700'
     },
@@ -46,7 +46,7 @@ export const WARDROBE_ITEMS = {
       name: 'Party Cone',
       category: 'hats',
       price: 0,
-      description: 'Striped festive party hat ready for celebration!',
+      description: 'Celebration',
       icon: '🎉',
       color: '#ff4081'
     },
@@ -55,7 +55,7 @@ export const WARDROBE_ITEMS = {
       name: 'Backward Cap',
       category: 'hats',
       price: 0,
-      description: 'Street-style backward baseball cap.',
+      description: 'Street style',
       icon: '🧢',
       color: '#29b6f6'
     },
@@ -64,7 +64,7 @@ export const WARDROBE_ITEMS = {
       name: 'Winter Beanie',
       category: 'hats',
       price: 0,
-      description: 'Soft knit beanie for cozy snuggles.',
+      description: 'Cozy knit',
       icon: '🧶',
       color: '#ab47bc'
     }
@@ -76,7 +76,7 @@ export const WARDROBE_ITEMS = {
       name: 'No Glasses',
       category: 'glasses',
       price: 0,
-      description: 'Clear, attentive gaze.',
+      description: 'Clear gaze',
       icon: '👀',
       color: 'transparent'
     },
@@ -85,16 +85,16 @@ export const WARDROBE_ITEMS = {
       name: 'Heart Shades',
       category: 'glasses',
       price: 0,
-      description: 'Rose-tinted heart sunglasses full of affection.',
+      description: 'Rose tint',
       icon: '💖',
       color: '#ff4081'
     },
     {
       id: 'glasses_cool',
-      name: 'Wayfarer Shades',
+      name: 'Wayfarer',
       category: 'glasses',
       price: 0,
-      description: 'Classic cool black shades with silver trim.',
+      description: 'Classic cool',
       icon: '🕶️',
       color: '#212121'
     },
@@ -103,18 +103,27 @@ export const WARDROBE_ITEMS = {
       name: 'Round Specs',
       category: 'glasses',
       price: 0,
-      description: 'Intelligent gold-rim round reader glasses.',
+      description: 'Gold wire',
       icon: '👓',
       color: '#d4af37'
     },
     {
       id: 'glasses_star',
-      name: 'Star Sunglasses',
+      name: 'Star Shades',
       category: 'glasses',
       price: 0,
-      description: 'Sparkling disco star shades!',
+      description: 'Disco star',
       icon: '⭐',
       color: '#ffeb3b'
+    },
+    {
+      id: 'glasses_visor',
+      name: 'Cyber Visor',
+      category: 'glasses',
+      price: 0,
+      description: 'Neon glow',
+      icon: '🥽',
+      color: '#00e5ff'
     }
   ],
 
@@ -124,7 +133,7 @@ export const WARDROBE_ITEMS = {
       name: 'Pastel Hoodie',
       category: 'costumes',
       price: 0,
-      description: 'Comfortable oversized hoodie & dark denims.',
+      description: 'Cozy oversized',
       icon: '👕',
       color: '#f8bbd0'
     },
@@ -133,7 +142,7 @@ export const WARDROBE_ITEMS = {
       name: 'Date Night Tux',
       category: 'costumes',
       price: 0,
-      description: 'Dapper dark suit jacket ready for an anniversary dinner.',
+      description: 'Dapper dinner',
       icon: '🤵',
       color: '#1a1a24'
     },
@@ -142,7 +151,7 @@ export const WARDROBE_ITEMS = {
       name: 'Star Pajamas',
       category: 'costumes',
       price: 0,
-      description: 'Soft silk midnight pajamas patterned with tiny stars.',
+      description: 'Midnight silk',
       icon: '✨',
       color: '#3949ab'
     },
@@ -151,7 +160,7 @@ export const WARDROBE_ITEMS = {
       name: 'Royal Kurta',
       category: 'costumes',
       price: 0,
-      description: 'Festive silk kurta with gold embroidered collar.',
+      description: 'Gold collar',
       icon: '🥻',
       color: '#c2185b'
     }
@@ -163,7 +172,7 @@ export const WARDROBE_ITEMS = {
       name: 'None',
       category: 'accessories',
       price: 0,
-      description: 'No extra accessories.',
+      description: 'Clean style',
       icon: '✨',
       color: 'transparent'
     },
@@ -172,7 +181,7 @@ export const WARDROBE_ITEMS = {
       name: 'Satin Bowtie',
       category: 'accessories',
       price: 0,
-      description: 'Charming bright red bowtie on collar.',
+      description: 'Charming red',
       icon: '🎀',
       color: '#e53935'
     },
@@ -181,7 +190,7 @@ export const WARDROBE_ITEMS = {
       name: 'Cozy Scarf',
       category: 'accessories',
       price: 0,
-      description: 'Warm fluffy pink scarf wrapped gently around neck.',
+      description: 'Fluffy warmth',
       icon: '🧣',
       color: '#ec407a'
     },
@@ -190,7 +199,7 @@ export const WARDROBE_ITEMS = {
       name: 'Cupid Wings',
       category: 'accessories',
       price: 0,
-      description: 'Magical fluttering angel wings on Ayush’s back.',
+      description: 'Flutter magic',
       icon: '🪽',
       color: '#ffffff'
     }

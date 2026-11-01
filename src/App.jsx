@@ -842,6 +842,7 @@ export default function App() {
         onClose={() => setActiveNav('home')}
         progression={progression}
         onUpdateProgression={setProgression}
+        onSpeechComment={(text) => showSpeech(text, 4000)}
       />
 
       {/* Activities / Mini-Games Hub Sheet */}

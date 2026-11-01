@@ -32,7 +32,6 @@ export default function CustomAyushModel({
   const bonesRef = useRef({});
   const morphMeshesRef = useRef([]);
   const tapPartRef = useRef('body');
-  const headAnchorRef = useRef();
 
   // Load GLTF / GLB model
   const gltf = useGLTF(modelUrl);
@@ -126,44 +125,53 @@ export default function CustomAyushModel({
     return clone;
   }, [scene]);
 
-  // Safely index morph targets & bones outside render
-  useEffect(() => {
-    if (!clonedScene) return;
-    const morphs = [];
-    const bones = {};
+  // Safely index skeleton bones for hierarchical attachment and procedural gestures
+  const bones = useMemo(() => {
+    if (!clonedScene) return {};
+    const b = {};
 
     clonedScene.traverse((child) => {
-      if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
-        morphs.push(child);
-      } else if (child.isBone) {
+      if (child.isBone) {
         const name = child.name;
-        if (name === 'Head' || name.toLowerCase().includes('head')) bones.head = child;
-        else if (name === 'Jaw' || name.toLowerCase().includes('jaw')) bones.jaw = child;
-        else if (name === 'Neck' || name.toLowerCase().includes('neck')) bones.neck = child;
-        else if (name.includes('Spine') || name === 'Chest' || name.toLowerCase().includes('chest')) bones.spine = child;
-        else if (name === 'LeftShoulder' || name.toLowerCase().includes('leftshoulder')) bones.leftShoulder = child;
-        else if (name === 'RightShoulder' || name.toLowerCase().includes('rightshoulder')) bones.rightShoulder = child;
-        else if (name === 'LeftArm' || name.toLowerCase().includes('leftarm')) bones.leftArm = child;
-        else if (name === 'RightArm' || name.toLowerCase().includes('rightarm')) bones.rightArm = child;
-        else if (name === 'LeftForeArm' || name === 'LeftElbow' || name.toLowerCase().includes('leftforearm')) bones.leftForeArm = child;
-        else if (name === 'RightForeArm' || name === 'RightElbow' || name.toLowerCase().includes('rightforearm')) bones.rightForeArm = child;
-        else if (name === 'LeftHand' || name === 'LeftWrist' || name.toLowerCase().includes('lefthand')) bones.leftHand = child;
-        else if (name === 'RightHand' || name === 'RightWrist' || name.toLowerCase().includes('righthand')) bones.rightHand = child;
-        else if (name === 'Hips' || name.toLowerCase().includes('hips')) bones.hips = child;
+        if (name === 'Head' || name.toLowerCase().includes('head')) b.head = child;
+        else if (name === 'Jaw' || name.toLowerCase().includes('jaw')) b.jaw = child;
+        else if (name === 'Neck' || name.toLowerCase().includes('neck')) b.neck = child;
+        else if (name.includes('Spine') || name === 'Chest' || name.toLowerCase().includes('chest')) b.spine = child;
+        else if (name === 'LeftShoulder' || name.toLowerCase().includes('leftshoulder')) b.leftShoulder = child;
+        else if (name === 'RightShoulder' || name.toLowerCase().includes('rightshoulder')) b.rightShoulder = child;
+        else if (name === 'LeftArm' || name.toLowerCase().includes('leftarm')) b.leftArm = child;
+        else if (name === 'RightArm' || name.toLowerCase().includes('rightarm')) b.rightArm = child;
+        else if (name === 'LeftForeArm' || name === 'LeftElbow' || name.toLowerCase().includes('leftforearm')) b.leftForeArm = child;
+        else if (name === 'RightForeArm' || name === 'RightElbow' || name.toLowerCase().includes('rightforearm')) b.rightForeArm = child;
+        else if (name === 'LeftHand' || name === 'LeftWrist' || name.toLowerCase().includes('lefthand')) b.leftHand = child;
+        else if (name === 'RightHand' || name === 'RightWrist' || name.toLowerCase().includes('righthand')) b.rightHand = child;
+        else if (name === 'Hips' || name.toLowerCase().includes('hips')) b.hips = child;
       }
     });
 
-    // Establish known natural resting pose immediately on load (arms hanging beside torso, relaxed elbows, natural head tilt)
-    // Note: Do NOT touch LeftShoulder or RightShoulder! Their bind quaternions provide the correct clavicle orientation.
-    if (bones.leftArm) bones.leftArm.rotation.set(1.30, 0.15, -0.05);
-    if (bones.rightArm) bones.rightArm.rotation.set(1.30, -0.15, 0.05);
-    if (bones.leftForeArm) bones.leftForeArm.rotation.set(0.35, 0, 0);
-    if (bones.rightForeArm) bones.rightForeArm.rotation.set(0.35, 0, 0);
-    if (bones.head) bones.head.rotation.set(0.03, 0.02, 0.02);
+    // Establish resting natural arm pose
+    if (b.leftArm) b.leftArm.rotation.set(1.30, 0.15, -0.05);
+    if (b.rightArm) b.rightArm.rotation.set(1.30, -0.15, 0.05);
+    if (b.leftForeArm) b.leftForeArm.rotation.set(0.35, 0, 0);
+    if (b.rightForeArm) b.rightForeArm.rotation.set(0.35, 0, 0);
+    if (b.head) b.head.rotation.set(0.03, 0.02, 0.02);
 
-    morphMeshesRef.current = morphs;
-    bonesRef.current = bones;
+    return b;
   }, [clonedScene]);
+
+  // Keep bonesRef and morphMeshes in sync for per-frame animation loops
+  useEffect(() => {
+    bonesRef.current = bones;
+    if (!clonedScene) return;
+
+    const morphs = [];
+    clonedScene.traverse((child) => {
+      if (child.isMesh && child.morphTargetDictionary && child.morphTargetInfluences) {
+        morphs.push(child);
+      }
+    });
+    morphMeshesRef.current = morphs;
+  }, [clonedScene, bones]);
 
   // Apply outfit / costume materials dynamically based on equippedWardrobe.costume
   useEffect(() => {
@@ -585,14 +593,6 @@ export default function CustomAyushModel({
       }
     }
 
-    // Sync head accessories anchor to head bone rotation (y=1.05, z=0.04)
-    if (bones.head && headAnchorRef.current) {
-      headAnchorRef.current.position.set(0, 1.05, 0.04);
-      headAnchorRef.current.rotation.x = bones.head.rotation.x;
-      headAnchorRef.current.rotation.y = bones.head.rotation.y;
-      headAnchorRef.current.rotation.z = bones.head.rotation.z;
-    }
-
     // 4. Subtle Base Stage Breathing (when standing idle)
     if (groupRef.current && !isClipRunning) {
       const breathe = Math.sin(t * 2.2) * 0.015;
@@ -612,7 +612,7 @@ export default function CustomAyushModel({
       {/* Synchronized 3D Wardrobe Accessories */}
       <WardrobeAccessories3D 
         equipped={equippedWardrobe} 
-        headRef={headAnchorRef}
+        bones={bones}
       />
 
       {/* Invisible Interactive Hitboxes covering Head, Cheeks/Face, Torso, Belly, Hands, and Feet */}
