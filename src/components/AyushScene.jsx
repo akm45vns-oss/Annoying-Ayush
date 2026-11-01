@@ -170,9 +170,16 @@ export default function AyushScene({
     >
       <Canvas
         shadows
+        dpr={[1, 2]}
         // Camera positioned for prominent full-body framing (83% viewport height) with headroom above hair
         camera={{ position: [0, 0.38, 3.24], fov: 44 }}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ 
+          antialias: true, 
+          alpha: true,
+          powerPreference: 'high-performance',
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.15
+        }}
       >
         <FaceFocusedCameraController controlsRef={controlsRef} />
 
@@ -187,6 +194,13 @@ export default function AyushScene({
           shadow-mapSize-height={1024}
           shadow-bias={-0.0001}
           color={preset.sunColor}
+        />
+
+        {/* Soft Portrait Face Key Light for vibrant, high-definition character rendering */}
+        <directionalLight
+          position={[0, 1.4, 2.2]}
+          intensity={0.65}
+          color="#fff8f2"
         />
 
         {/* Soft Rim / Fill Light */}

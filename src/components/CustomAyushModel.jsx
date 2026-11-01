@@ -50,6 +50,18 @@ export default function CustomAyushModel({
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        // High-definition texture filtering & anisotropic sharpening
+        if (child.material) {
+          ['map', 'normalMap', 'roughnessMap', 'metalnessMap'].forEach((mapName) => {
+            if (child.material[mapName]) {
+              child.material[mapName].anisotropy = 8;
+              child.material[mapName].generateMipmaps = true;
+              child.material[mapName].minFilter = THREE.LinearMipmapLinearFilter;
+              child.material[mapName].magFilter = THREE.LinearFilter;
+              child.material[mapName].needsUpdate = true;
+            }
+          });
+        }
         if (child.geometry) {
           child.geometry.computeBoundingBox();
           const geomBox = child.geometry.boundingBox.clone();
@@ -170,25 +182,25 @@ export default function CustomAyushModel({
           const mat = child.material;
 
           if (costumeId === 'costume_tuxedo') {
-            // Elegant Midnight Navy / Charcoal Tuxedo with satin finish
-            mat.color.set('#1a1a24');
-            mat.roughness = 0.35;
-            mat.metalness = 0.35;
+            // Elegant Midnight Charcoal Tuxedo (rich, realistic matte woven wool fabric)
+            mat.color.set('#202430');
+            mat.roughness = 0.80;
+            mat.metalness = 0.04;
           } else if (costumeId === 'costume_pajamas') {
             // Soft Cozy Pastel Blue / Lavender Star Pajamas
             mat.color.set('#6b8bc2');
             mat.roughness = 0.90;
-            mat.metalness = 0.05;
+            mat.metalness = 0.0;
           } else if (costumeId === 'costume_traditional') {
             // Royal Rich Maroon / Crimson Kurta
             mat.color.set('#8e1538');
-            mat.roughness = 0.45;
-            mat.metalness = 0.25;
+            mat.roughness = 0.68;
+            mat.metalness = 0.12;
           } else {
             // Default pastel hoodie & denims
             mat.color.set('#ffffff');
-            mat.roughness = 1.0;
-            mat.metalness = 1.0;
+            mat.roughness = 0.82;
+            mat.metalness = 0.0;
           }
           mat.needsUpdate = true;
         }
@@ -201,21 +213,21 @@ export default function CustomAyushModel({
           }
           const mat = child.material;
           if (costumeId === 'costume_tuxedo') {
-            mat.color.set('#111111');
-            mat.roughness = 0.25;
-            mat.metalness = 0.4;
+            mat.color.set('#1a1a1a');
+            mat.roughness = 0.42;
+            mat.metalness = 0.25;
           } else if (costumeId === 'costume_pajamas') {
             mat.color.set('#5c6bc0');
-            mat.roughness = 0.9;
+            mat.roughness = 0.92;
             mat.metalness = 0.0;
           } else if (costumeId === 'costume_traditional') {
             mat.color.set('#c5a059');
-            mat.roughness = 0.4;
-            mat.metalness = 0.3;
+            mat.roughness = 0.50;
+            mat.metalness = 0.25;
           } else {
             mat.color.set('#ffffff');
-            mat.roughness = 1.0;
-            mat.metalness = 1.0;
+            mat.roughness = 0.85;
+            mat.metalness = 0.0;
           }
           mat.needsUpdate = true;
         }
@@ -573,8 +585,9 @@ export default function CustomAyushModel({
       }
     }
 
-    // Sync head accessories anchor to head bone rotation
+    // Sync head accessories anchor to head bone rotation & neck base pivot (y=1.00, z=0.02)
     if (bones.head && headAnchorRef.current) {
+      headAnchorRef.current.position.set(0, 1.00, 0.02);
       headAnchorRef.current.rotation.x = bones.head.rotation.x;
       headAnchorRef.current.rotation.y = bones.head.rotation.y;
       headAnchorRef.current.rotation.z = bones.head.rotation.z;
